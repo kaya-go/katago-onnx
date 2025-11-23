@@ -180,6 +180,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-3.23.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstandard-0.25.0-py313h9734d34_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-h6491c7d_2.conda
+      - pypi: https://files.pythonhosted.org/packages/a0/ef/cd39e8db4385260b6f2e021dd8908e8f5167bfddce238bdea0e82b2f59c6/sgfmill-1.1.1-py3-none-any.whl
       - pypi: ./
 packages:
 - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_2.conda
@@ -1087,7 +1088,7 @@ packages:
 - pypi: ./
   name: katago-onnx
   version: 0.1.0
-  sha256: 114113ba2ba5264e1975d7434e18d356bc633da809401cbf6c2aaf5793563c4f
+  sha256: 69a24b8f7838a8d53667b23d98eb1532d8740da46defda083a3a5622608f5449
   requires_dist:
   - torch
   - numpy
@@ -2159,6 +2160,10 @@ packages:
   - pkg:pypi/setuptools?source=hash-mapping
   size: 748788
   timestamp: 1748804951958
+- pypi: https://files.pythonhosted.org/packages/a0/ef/cd39e8db4385260b6f2e021dd8908e8f5167bfddce238bdea0e82b2f59c6/sgfmill-1.1.1-py3-none-any.whl
+  name: sgfmill
+  version: 1.1.1
+  sha256: 759cd843eba647875931d3a10eb329362087b9832f6b49ee85cf8948b0608b3d
 - conda: https://conda.anaconda.org/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
   sha256: 458227f759d5e3fcec5d9b7acce54e10c9e1f4f4b7ec978f3bfd54ce4ee9853d
   md5: 3339e3b65d58accf4ca4fb8748ab16b3
