@@ -17,6 +17,9 @@ ipywidgets = ">=8.1.8,<9"
 tqdm = ">=4.67.1,<5"
 ipykernel = ">=7.1.0,<8"
 platformdirs = ">=4.5.0,<5"
+onnxruntime = ">=1.22.0,<2"
+onnxscript = ">=0.5.6,<0.6"
+pandas = ">=2.3.3,<3"
 
 [pypi-dependencies]
 katago-onnx = { path = ".", editable = true }
