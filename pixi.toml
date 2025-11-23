@@ -1,0 +1,18 @@
+[workspace]
+authors = ["Hadrien Mary <hadrien.mary@gmail.com>"]
+channels = ["conda-forge"]
+name = "katago-onnx"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.13.9,<4"
+jupyterlab = ">=4.5.0,<5"
+pytorch = ">=2.8.0,<3"
+httpx = ">=0.28.1,<0.29"
+ruff = ">=0.14.6,<0.15"
+ipywidgets = ">=8.1.8,<9"
+tqdm = ">=4.67.1,<5"
+ipykernel = ">=7.1.0,<8"
