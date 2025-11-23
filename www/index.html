@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KataGo ONNX Web Tester</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .controls {
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .row {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #board-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        canvas {
+            border: 1px solid #000;
+            background-color: #DCB35C;
+        }
+        #output {
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            background-color: #e1e1e1;
+        }
+    </style>
+    <!-- Load ONNX Runtime Web -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+</head>
+<body>
+    <h1>KataGo ONNX Web Tester</h1>
+    
+    <div class="container">
+        <div class="controls">
+            <h3>1. Load Model (.onnx)</h3>
+            <div id="model-drop" class="drop-zone">
+                Drag & Drop ONNX Model here or click to select
+                <input type="file" id="model-input" accept=".onnx" style="display: none">
+            </div>
+            <div id="model-status">No model loaded</div>
+        </div>
+
+        <div class="controls">
+            <h3>2. Load SGF (.sgf)</h3>
+            <div id="sgf-drop" class="drop-zone">
+                Drag & Drop SGF file here or click to select
+                <input type="file" id="sgf-input" accept=".sgf" style="display: none">
+            </div>
+            <div id="sgf-status">No SGF loaded</div>
+        </div>
+
+        <div class="controls">
+            <h3>3. Settings & Run</h3>
+            <div class="row">
+                <label for="move-number">Target Move Number:</label>
+                <input type="number" id="move-number" value="10" min="0">
+            </div>
+            <div class="row">
+                <button id="run-btn" disabled>Run Inference</button>
+            </div>
+        </div>
+
+        <div id="board-container">
+            <canvas id="board" width="600" height="600"></canvas>
+        </div>
+
+        <div id="output">Results will appear here...</div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
