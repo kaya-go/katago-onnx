@@ -115,7 +115,12 @@ def run_inference(
 
     winrate = value_probs[0]  # Assuming index 0 is win for current player? Or black? Or white?
 
-    return policy_probs, value_probs, winrate
+    # Process Score Lead
+    # miscvalue_logits shape: [batch, 10]
+    # Index 2 is lead
+    score_lead = miscvalue_logits[:, 2].item() * model.lead_multiplier
+
+    return policy_probs, value_probs, winrate, score_lead
 
 
 def get_top_moves(
@@ -123,6 +128,7 @@ def get_top_moves(
     gamestate: GameState,
     features: Features,
     top_k: int = 10,
+    model=None,
 ):
     top_moves_idx = np.argsort(policy_probs)[::-1][:top_k]
 
@@ -131,6 +137,7 @@ def get_top_moves(
         loc = features.tensor_pos_to_loc(idx, gamestate.board)
 
         x, y = None, None
+        move_str = ""
 
         if loc is None:
             move_str = "PASS"
@@ -143,16 +150,49 @@ def get_top_moves(
             # KataGo board uses 0-indexed coordinates.
             # Let's just print (x,y) for now or convert to GTP-like string
             col_str = "ABCDEFGHJKLMNOPQRST"[x]
-            row_str = str(y + 1)
+            row_str = str(gamestate.board.y_size - y)
             move_str = f"{col_str}{row_str}"
 
-        move = {
+        move_data = {
             "loc": loc,
             "x": x,
             "y": y,
             "prob": policy_probs[idx],
             "move_str": move_str,
         }
-        top_moves.append(move)
+
+        # If model is provided, compute winrate and score lead for this move
+        if model is not None and loc != gamestate.board.loc(-10, -10):
+            # Clone gamestate
+            # Note: GameState.copy() might not be deep enough or exist, let's check board.py
+            # Assuming we can copy or re-create.
+            # Actually GameState has a copy method? Let's check gamestate.py
+            # For now, let's assume we can just play on a copy.
+
+            # Create a new gamestate from scratch is safer if copy is not robust
+            # But we need the history.
+            # Let's try to use the copy method if it exists.
+            gs_copy = gamestate.copy()
+
+            try:
+                gs_copy.play(gs_copy.board.pla, loc)
+
+                # Featurize
+                _, bin_input, global_input = featurize(gs_copy, model)
+
+                # Run inference
+                _, _, winrate, score_lead = run_inference(model, bin_input, global_input)
+
+                # The winrate/score is from the perspective of the NEXT player (who just played? No, who is TO PLAY)
+                # After playing, it's the opponent's turn.
+                # So the value returned is for the opponent.
+                # We want it for the current player.
+                move_data["score_lead"] = -score_lead
+
+            except Exception as e:
+                print(f"Error computing value for move {move_str}: {e}")
+                move_data["score_lead"] = np.nan
+
+        top_moves.append(move_data)
 
     return pd.DataFrame(top_moves)
