@@ -6,16 +6,15 @@ build-backend = "setuptools.build_meta"
 name = "katago-onnx"
 version = "0.1.0"
 description = "KataGo ONNX Conversion Tools"
-authors = [
-    {name = "Hadrien Mary", email = "hadrien.mary@gmail.com"},
-]
-dependencies = [
-    "torch",
-    "numpy",
-]
+authors = [{ name = "Hadrien Mary", email = "hadrien.mary@gmail.com" }]
+dependencies = ["torch", "numpy", "typer"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
+
 [tool.ruff]
 line-length = 120
+
+[project.scripts]
+katago-onnx = "katago_onnx.cli:app"

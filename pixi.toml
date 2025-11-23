@@ -20,6 +20,7 @@ platformdirs = ">=4.5.0,<5"
 onnxruntime = ">=1.22.0,<2"
 onnxscript = ">=0.5.6,<0.6"
 pandas = ">=2.3.3,<3"
+typer = ">=0.20.0,<0.21"
 
 [pypi-dependencies]
 katago-onnx = { path = ".", editable = true }
