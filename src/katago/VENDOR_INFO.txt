@@ -1,0 +1,3 @@
+Source: https://github.com/lightvector/KataGo.git
+Branch/Tag: v1.16.4
+Commit: 4b8de63bea2bd8790db96cd6f8daf86dc87be6f7
