@@ -25,8 +25,14 @@ def download_and_extract_model(network_name: str, extract_to: str):
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(temp_dir)
 
-    # Move the model file
+    # Find the model.ckpt file (can be at root or inside a folder)
     model_path = temp_dir / "model.ckpt"
+    if not model_path.exists():
+        # Search for model.ckpt in subdirectories
+        model_files = list(temp_dir.glob("**/model.ckpt"))
+        if not model_files:
+            raise FileNotFoundError(f"model.ckpt not found in {zip_path}")
+        model_path = model_files[0]
 
     # Move the model to the desired location
     extract_path = pathlib.Path(extract_to)

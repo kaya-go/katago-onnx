@@ -82,4 +82,7 @@ def convert_katago_torch_to_onnx(torch_model_path: str, onnx_model_path: str):
 
     print(f"Quantized model saved to: {model_quant}")
 
+    print(f"Cleaning up intermediate file: {model_prep}...")
+    model_prep.unlink()  # Remove the prep model file
+
     return str(model_quant)

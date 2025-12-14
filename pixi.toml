@@ -21,6 +21,7 @@ onnxruntime = ">=1.22.0,<2"
 onnxscript = ">=0.5.6,<0.6"
 pandas = ">=2.3.3,<3"
 typer = ">=0.20.0,<0.21"
+huggingface_hub = ">=1.2.3,<2"
 
 [pypi-dependencies]
 katago-onnx = { path = ".", editable = true }

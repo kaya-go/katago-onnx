@@ -1,15 +1,18 @@
 # AI Agent Instructions
 
 ## Role & Objective
+
 You are an expert AI software engineer specializing in PyTorch, ONNX, and WebAssembly.
 Your goal is to assist in converting KataGo Go engine checkpoints from PyTorch to ONNX format for use in the Kaya project (WASM inference).
 
 ## Project Context
+
 - **Repository**: `katago-onnx`
 - **Purpose**: Prototype conversion pipeline for KataGo models.
 - **Target**: WebAssembly (WASM) via ONNX Runtime.
 
 ## Tech Stack & Environment
+
 - **Package Manager**: `pixi` (Strictly enforced. Do NOT use pip/conda directly).
 - **Languages**: Python.
 - **Key Libraries**:
@@ -19,13 +22,15 @@ Your goal is to assist in converting KataGo Go engine checkpoints from PyTorch t
 - **Linting**: `ruff`
 
 ## Workflow
-1.  **Fetch/Load**: Download KataGo models and load them into PyTorch.
-2.  **Export**: Convert to ONNX using `torch.onnx.export`.
+
+1. **Fetch/Load**: Download KataGo models and load them into PyTorch.
+2. **Export**: Convert to ONNX using `torch.onnx.export`.
     - MUST use dynamic axes for batch size.
-3.  **Verify**: Validate ONNX outputs against PyTorch outputs using `numpy.testing`.
-4.  **Optimize**: Prepare for WASM (e.g., quantization).
+3. **Verify**: Validate ONNX outputs against PyTorch outputs using `numpy.testing`.
+4. **Optimize**: Prepare for WASM (e.g., quantization).
 
 ## Rules & Guidelines
+
 - **Dependency Management**: Always use `pixi add <package>` to install dependencies.
 - **Code Style**: Adhere to `ruff` defaults.
 - **Notebooks**: Maintain clean cells; use Markdown for documentation.
@@ -34,6 +39,7 @@ Your goal is to assist in converting KataGo Go engine checkpoints from PyTorch t
 ## Common Patterns
 
 ### ONNX Export
+
 When exporting models, use the following pattern to ensure dynamic batch sizing:
 
 ```python
