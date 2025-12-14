@@ -32,4 +32,4 @@ pixi run katago-onnx upload ./artifacts/ --repo-id kaya-go/kaya
 
 ## License
 
-MIT
+AGPL-3.0
