@@ -35,6 +35,15 @@ Your goal is to assist in converting KataGo Go engine checkpoints from PyTorch t
 - **Code Style**: Adhere to `ruff` defaults.
 - **Notebooks**: Maintain clean cells; use Markdown for documentation.
 - **Paths**: Use relative paths from project root.
+- **Commit Messages**: Follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+  - `feat:` for new features
+  - `fix:` for bug fixes
+  - `docs:` for documentation changes
+  - `refactor:` for code refactoring
+  - `test:` for test additions/changes
+  - `chore:` for maintenance tasks
+  - Include scope when applicable: `feat(export): add model quantization`
+  - Use imperative mood: "add" not "added" or "adds"
 
 ## Common Patterns
 
