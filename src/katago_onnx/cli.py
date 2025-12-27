@@ -51,8 +51,15 @@ def upload(
     folder_path: Annotated[str, typer.Argument(help="Path to the folder to upload")],
     repo_id: Annotated[str, typer.Option("--repo-id", "-r", help="HF repository ID")] = HF_REPO_ID,
     commit_message: Annotated[str | None, typer.Option("--message", "-m", help="Commit message")] = None,
+    release_version: Annotated[
+        str | None, typer.Option("--release-version", help="Version tag to create (e.g., v1.0.0)")
+    ] = None,
 ):
-    """Upload a folder to Hugging Face Hub, preserving directory structure."""
+    """Upload a folder to Hugging Face Hub, preserving directory structure.
+
+    If --release-version is provided, a tag is created after the upload and the commit
+    message defaults to 'Release <version>' if not specified.
+    """
     folder = pathlib.Path(folder_path)
 
     # Copy HF_MODEL_CARD.md to README.md in the upload folder
@@ -67,6 +74,7 @@ def upload(
         folder_path=folder_path,
         repo_id=repo_id,
         commit_message=commit_message,
+        release_version=release_version,
     )
     print("Upload complete!")
 

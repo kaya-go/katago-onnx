@@ -29,7 +29,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          pixi run katago-onnx upload ./artifacts/ --repo-id kaya-go/kaya --message "Release ${{ inputs.version }}"
+          pixi run katago-onnx upload ./artifacts/ --repo-id kaya-go/kaya --release-version ${{ inputs.version }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

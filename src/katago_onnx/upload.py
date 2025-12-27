@@ -12,6 +12,7 @@ def upload_folder_to_huggingface(
     repo_id: str = HF_REPO_ID,
     path_in_repo: str | None = None,
     commit_message: str | None = None,
+    release_version: str | None = None,
 ) -> str:
     """Upload a folder to Hugging Face Hub, preserving the directory structure.
 
@@ -23,6 +24,9 @@ def upload_folder_to_huggingface(
         path_in_repo: Base path in the repo where folder contents will be stored.
                       If None, uploads to the root.
         commit_message: Custom commit message. If None, a default is used.
+                        If release_version is provided and message is None, auto-generates message.
+        release_version: Version tag to create after upload (e.g., "v1.0.0").
+                 If provided, creates a tag on the new commit.
 
     Returns:
         The URL of the repository.
@@ -33,7 +37,10 @@ def upload_folder_to_huggingface(
         path_in_repo = ""
 
     if commit_message is None:
-        commit_message = f"Upload {folder_path.name}"
+        if release_version:
+            commit_message = f"Release {release_version}"
+        else:
+            commit_message = f"Upload {folder_path.name}"
 
     api = HfApi()
 
@@ -51,4 +58,15 @@ def upload_folder_to_huggingface(
     )
 
     print(f"Uploaded folder {folder_path} to {url}")
+
+    # Create version tag if requested
+    if release_version:
+        api.create_tag(
+            repo_id=repo_id,
+            tag=release_version,
+            tag_message=f"Release {release_version}",
+            repo_type="model",
+        )
+        print(f"Created tag {release_version} on {repo_id}")
+
     return url
