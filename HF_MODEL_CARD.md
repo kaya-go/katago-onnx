@@ -28,10 +28,11 @@ These models are converted from the official KataGo PyTorch checkpoints to ONNX 
 | `kata1-b28c512nbt-adam-s11165M-d5387M`      | 28 blocks, 512 channels |
 | `kata1-b28c512nbt-s12043015936-d5616446734` | 28 blocks, 512 channels |
 
-Each model is available in two versions:
+Each model is available in three versions:
 
-- **`.onnx`** - Full precision (FP32)
-- **`.quant.onnx`** - Quantized (INT8) - ~4x smaller, suitable for web/edge deployment
+- **`.fp32.onnx`** - Full precision (FP32) - Recommended for browser/WASM
+- **`.fp16.onnx`** - Half precision (FP16) - For native apps (CoreML, CUDA, WebGPU)
+- **`.uint8.onnx`** - Quantized (UINT8) - ~4x smaller, for memory-constrained devices
 
 ## Usage
 
@@ -41,8 +42,8 @@ Each model is available in two versions:
 import onnxruntime as ort
 import numpy as np
 
-# Load the model
-session = ort.InferenceSession("kata1-b28c512nbt-adam-s11165M-d5387M.quant.onnx")
+# Load the model (use .fp32.onnx for browser/WASM, .fp16.onnx for native apps)
+session = ort.InferenceSession("kata1-b28c512nbt-adam-s11165M-d5387M.fp32.onnx")
 
 # Prepare inputs (batch_size, channels, height, width)
 bin_input = np.random.randn(1, 22, 19, 19).astype(np.float32)
@@ -62,8 +63,9 @@ policy, value, miscvalue, moremiscvalue, ownership, scoring, futurepos, seki, sc
 ```javascript
 import * as ort from "onnxruntime-web";
 
+// Use .fp32.onnx for WASM backend, or .uint8.onnx for smaller download size
 const session = await ort.InferenceSession.create(
-  "kata1-b28c512nbt-adam-s11165M-d5387M.quant.onnx"
+  "kata1-b28c512nbt-adam-s11165M-d5387M.fp32.onnx"
 );
 
 const binInput = new ort.Tensor(
@@ -135,7 +137,8 @@ If you use these models, please cite the original KataGo paper:
 
 - **Conversion Tool**: [katago-onnx](https://github.com/kaya-go/katago-onnx)
 - **ONNX Opset**: 17
-- **Quantization**: Dynamic quantization (QUInt8 weights)
+- **FP16 Conversion**: Internal computations in FP16, I/O remains FP32 for compatibility
+- **UINT8 Quantization**: Dynamic quantization with QUInt8 weights
 - **Dynamic Axes**: Batch size, board height/width are dynamic
 
 ## Acknowledgments

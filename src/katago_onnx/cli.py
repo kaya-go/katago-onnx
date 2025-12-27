@@ -5,8 +5,8 @@ from typing import Annotated
 import typer
 from tqdm.auto import tqdm
 
+from .convert import convert_katago_torch_to_onnx
 from .download import download_and_extract_model
-from .export import convert_katago_torch_to_onnx
 from .upload import HF_REPO_ID, upload_folder_to_huggingface
 
 app = typer.Typer()
@@ -20,12 +20,15 @@ NETWORK_NAMES = ["kata1-b28c512nbt-adam-s11165M-d5387M", "kata1-b28c512nbt-s1204
 @app.command()
 def convert(
     base_dir: Annotated[str, typer.Argument(help="Directory to save the converted models")],
+    network_names: Annotated[
+        list[str], typer.Option("--networks", "-n", help="List of network names to convert")
+    ] = NETWORK_NAMES,
 ):
     """Download KataGo models and convert them to ONNX format."""
     base_path = pathlib.Path(base_dir)
     base_path.mkdir(parents=True, exist_ok=True)
 
-    for network_name in tqdm(NETWORK_NAMES, desc="Converting models"):
+    for network_name in tqdm(network_names, desc="Converting models"):
         # Download and extract the model
         torch_model_path = download_and_extract_model(network_name, base_dir)
 
@@ -39,7 +42,7 @@ def convert(
             onnx_model_path=str(onnx_model_path),
         )
 
-        # Cleanup torch model file and prep.onnx file
+        # Cleanup original torch model file
         pathlib.Path(torch_model_path).unlink()
 
 

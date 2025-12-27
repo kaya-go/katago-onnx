@@ -15,6 +15,8 @@ def upload_folder_to_huggingface(
 ) -> str:
     """Upload a folder to Hugging Face Hub, preserving the directory structure.
 
+    Existing files in the target path are deleted before uploading.
+
     Args:
         folder_path: Path to the folder to upload.
         repo_id: The HF repository ID (e.g., "kaya-go/kaya").
@@ -38,13 +40,14 @@ def upload_folder_to_huggingface(
     # Create repo if it doesn't exist (will be a no-op if it exists)
     create_repo(repo_id=repo_id, repo_type="model", exist_ok=True)
 
-    # Upload the entire folder
+    # Upload the folder, deleting all existing files in the target path first
     url = api.upload_folder(
         folder_path=str(folder_path),
         path_in_repo=path_in_repo,
         repo_id=repo_id,
         repo_type="model",
         commit_message=commit_message,
+        delete_patterns="*",  # Delete all existing files in path_in_repo before upload
     )
 
     print(f"Uploaded folder {folder_path} to {url}")

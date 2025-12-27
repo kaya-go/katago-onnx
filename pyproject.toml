@@ -12,9 +12,11 @@ dependencies = ["torch", "numpy", "typer"]
 [tool.setuptools.packages.find]
 where = ["src"]
 
-
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
+select = ["I"]
 
 [project.scripts]
 katago-onnx = "katago_onnx.cli:app"

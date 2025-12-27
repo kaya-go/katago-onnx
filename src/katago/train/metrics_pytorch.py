@@ -1,14 +1,16 @@
-from typing import Any, Dict, List
 import math
-
-from ..train.model_pytorch import EXTRA_SCORE_DISTR_RADIUS, Model, compute_gain, ExtraOutputs, MetadataEncoder
+from typing import Any, Dict, List
 
 import torch
 import torch.nn
 import torch.nn.functional
 
+from ..train.model_pytorch import EXTRA_SCORE_DISTR_RADIUS, ExtraOutputs, MetadataEncoder, Model, compute_gain
+
+
 def cross_entropy(pred_logits, target_probs, dim):
     return -torch.sum(target_probs * torch.nn.functional.log_softmax(pred_logits, dim=dim), dim=dim)
+
 
 def huber_loss(x, y, delta):
     abs_diff = torch.abs(x - y)
@@ -18,8 +20,10 @@ def huber_loss(x, y, delta):
         0.5 * abs_diff * abs_diff,
     )
 
+
 def constant_like(data, other_tensor):
     return torch.tensor(data, dtype=other_tensor.dtype, device=other_tensor.device, requires_grad=False)
+
 
 class Metrics:
     def __init__(self, batch_size: int, world_size: int, raw_model: Model):
@@ -32,7 +36,7 @@ class Metrics:
         self.num_td_values = 3
         self.num_futurepos_values = 2
         self.num_seki_logits = 4
-        self.scorebelief_len = 2 * (self.pos_len*self.pos_len + EXTRA_SCORE_DISTR_RADIUS)
+        self.scorebelief_len = 2 * (self.pos_len * self.pos_len + EXTRA_SCORE_DISTR_RADIUS)
 
         self.scoremean_multiplier = raw_model.scoremean_multiplier
 
@@ -42,11 +46,12 @@ class Metrics:
 
     def state_dict(self):
         return dict(
-            moving_unowned_proportion_sum = self.moving_unowned_proportion_sum,
-            moving_unowned_proportion_weight = self.moving_unowned_proportion_weight,
+            moving_unowned_proportion_sum=self.moving_unowned_proportion_sum,
+            moving_unowned_proportion_weight=self.moving_unowned_proportion_weight,
         )
-    def load_state_dict(self, state_dict: Dict[str,Any]):
-        if isinstance(state_dict["moving_unowned_proportion_sum"],torch.Tensor):
+
+    def load_state_dict(self, state_dict: Dict[str, Any]):
+        if isinstance(state_dict["moving_unowned_proportion_sum"], torch.Tensor):
             self.moving_unowned_proportion_sum = state_dict["moving_unowned_proportion_sum"].item()
         else:
             self.moving_unowned_proportion_sum = state_dict["moving_unowned_proportion_sum"]
@@ -64,7 +69,9 @@ class Metrics:
         loss = cross_entropy(pred_logits, target_probs, dim=1)
         return 0.15 * global_weight * weight * loss
 
-    def loss_qvalues_samplewise(self, pred_wl_pretanh, pred_score_prescaled, target_wl, target_score, target_visits, global_weight):
+    def loss_qvalues_samplewise(
+        self, pred_wl_pretanh, pred_score_prescaled, target_wl, target_score, target_visits, global_weight
+    ):
         assert pred_wl_pretanh.shape == (self.n, self.policy_len)
         assert pred_score_prescaled.shape == (self.n, self.policy_len)
         assert target_wl.shape == (self.n, self.policy_len)
@@ -78,21 +85,26 @@ class Metrics:
         pred_wl_logits = pred_wl_pretanh * mask * 2.0
         target_wl_probs = (1.0 + target_wl) / 2.0
 
-        loss_qvalues_winloss_by_move = torch.nn.functional.binary_cross_entropy_with_logits(pred_wl_logits, target_wl_probs, reduction="none")
+        loss_qvalues_winloss_by_move = torch.nn.functional.binary_cross_entropy_with_logits(
+            pred_wl_logits, target_wl_probs, reduction="none"
+        )
         loss_qvalues_winloss = torch.sum(
             loss_qvalues_winloss_by_move * sqrtvisits,
             dim=1,
-        ) / (sum_sqrtvisits + 1.0)  # Add 1.0 to sum of sqrt visits so that we don't divide by 0 if we have no such data.
+        ) / (
+            sum_sqrtvisits + 1.0
+        )  # Add 1.0 to sum of sqrt visits so that we don't divide by 0 if we have no such data.
 
         pred_score = pred_score_prescaled * mask * self.scoremean_multiplier
-        loss_qvalues_score_by_move = huber_loss(pred_score, target_score, delta = 12.0) * sqrtvisits
+        loss_qvalues_score_by_move = huber_loss(pred_score, target_score, delta=12.0) * sqrtvisits
         loss_qvalues_score = torch.sum(
             loss_qvalues_score_by_move * sqrtvisits,
             dim=1,
-        ) / (sum_sqrtvisits + 1.0)  # Add 1.0 to sum of sqrt visits so that we don't divide by 0 if we have no such data.
+        ) / (
+            sum_sqrtvisits + 1.0
+        )  # Add 1.0 to sum of sqrt visits so that we don't divide by 0 if we have no such data.
 
         return 0.4 * global_weight * loss_qvalues_winloss, 0.0015 * global_weight * loss_qvalues_score
-
 
     def loss_value_samplewise(self, pred_logits, target_probs, weight, global_weight):
         assert pred_logits.shape == (self.n, self.value_len)
@@ -106,15 +118,16 @@ class Metrics:
         assert target_probs.shape == (self.n, self.num_td_values, self.value_len)
         assert weight.shape == (self.n,)
         assert global_weight.shape == (self.n,)
-        loss = cross_entropy(pred_logits, target_probs, dim=2) - cross_entropy(torch.log(target_probs + 1.0e-30), target_probs, dim=2)
+        loss = cross_entropy(pred_logits, target_probs, dim=2) - cross_entropy(
+            torch.log(target_probs + 1.0e-30), target_probs, dim=2
+        )
         return 1.20 * global_weight.unsqueeze(1) * weight.unsqueeze(1) * loss
 
     def loss_td_score_samplewise(self, pred, target, weight, global_weight):
         assert pred.shape == (self.n, self.num_td_values)
         assert target.shape == (self.n, self.num_td_values)
-        loss = torch.sum(huber_loss(pred, target, delta = 12.0), dim=1)
+        loss = torch.sum(huber_loss(pred, target, delta=12.0), dim=1)
         return 0.0004 * global_weight * weight * loss
-
 
     def loss_ownership_samplewise(self, pred_pretanh, target, weight, mask, mask_sum_hw, global_weight):
         # This uses a formulation where each batch element cares about its average loss.
@@ -124,14 +137,17 @@ class Metrics:
         assert target.shape == (self.n, self.pos_len, self.pos_len)
         assert mask.shape == (self.n, self.pos_len, self.pos_len)
         assert mask_sum_hw.shape == (self.n,)
-        pred_logits = pred_pretanh.view(self.n,self.pos_area) * 2.0
-        target_probs = (1.0 + target.view(self.n,self.pos_area)) / 2.0
-        loss = torch.sum(
-            torch.nn.functional.binary_cross_entropy_with_logits(pred_logits, target_probs, reduction="none") * mask.view(self.n,self.pos_area),
-            dim=1,
-        ) / mask_sum_hw
+        pred_logits = pred_pretanh.view(self.n, self.pos_area) * 2.0
+        target_probs = (1.0 + target.view(self.n, self.pos_area)) / 2.0
+        loss = (
+            torch.sum(
+                torch.nn.functional.binary_cross_entropy_with_logits(pred_logits, target_probs, reduction="none")
+                * mask.view(self.n, self.pos_area),
+                dim=1,
+            )
+            / mask_sum_hw
+        )
         return 1.5 * global_weight * weight * loss
-
 
     def loss_scoring_samplewise(self, pred_scoring, target, weight, mask, mask_sum_hw, global_weight):
         assert pred_scoring.shape == (self.n, 1, self.pos_len, self.pos_len)
@@ -139,11 +155,10 @@ class Metrics:
         assert mask.shape == (self.n, self.pos_len, self.pos_len)
         assert mask_sum_hw.shape == (self.n,)
 
-        loss = torch.sum(torch.square(pred_scoring.squeeze(1) - target) * mask, dim=(1,2)) / mask_sum_hw
+        loss = torch.sum(torch.square(pred_scoring.squeeze(1) - target) * mask, dim=(1, 2)) / mask_sum_hw
         # Simple huberlike transform to reduce crazy values
         loss = 4.0 * (torch.sqrt(loss * 0.5 + 1.0) - 1.0)
         return global_weight * weight * loss
-
 
     def loss_futurepos_samplewise(self, pred_pretanh, target, weight, mask, mask_sum_hw, global_weight):
         # The futurepos targets extrapolate a fixed number of steps into the future independent
@@ -159,12 +174,22 @@ class Metrics:
         assert mask.shape == (self.n, self.pos_len, self.pos_len)
         assert mask_sum_hw.shape == (self.n,)
         loss = torch.square(torch.tanh(pred_pretanh) - target) * mask.unsqueeze(1)
-        loss = loss * constant_like([1.0,0.25], loss).view(1,2,1,1)
+        loss = loss * constant_like([1.0, 0.25], loss).view(1, 2, 1, 1)
         loss = torch.sum(loss, dim=(1, 2, 3)) / torch.sqrt(mask_sum_hw)
         return 0.25 * global_weight * weight * loss
 
-
-    def loss_seki_samplewise(self, pred_logits, target, target_ownership, weight, mask, mask_sum_hw, global_weight, is_training, skip_moving_update):
+    def loss_seki_samplewise(
+        self,
+        pred_logits,
+        target,
+        target_ownership,
+        weight,
+        mask,
+        mask_sum_hw,
+        global_weight,
+        is_training,
+        skip_moving_update,
+    ):
         assert self.num_seki_logits == 4
         assert pred_logits.shape == (self.n, self.num_seki_logits, self.pos_len, self.pos_len)
         assert target.shape == (self.n, self.pos_len, self.pos_len)
@@ -200,9 +225,7 @@ class Metrics:
         loss_sign = torch.sum(cross_entropy(sign_pred, sign_target, dim=1) * mask, dim=(1, 2))
 
         # Loss for generally predicting points that nobody will own
-        neutral_pred = torch.stack(
-            (pred_logits[:, 3, :, :], torch.zeros_like(target_ownership)), dim=1
-        )
+        neutral_pred = torch.stack((pred_logits[:, 3, :, :], torch.zeros_like(target_ownership)), dim=1)
         neutral_target = torch.stack((unowned_target, owned_target), dim=1)
         loss_neutral = torch.sum(cross_entropy(neutral_pred, neutral_target, dim=1) * mask, dim=(1, 2))
 
@@ -210,105 +233,115 @@ class Metrics:
         loss = loss / mask_sum_hw
         return (global_weight * seki_weight_scale * weight * loss, seki_weight_scale)
 
-
     def loss_scoremean_samplewise(self, pred, target, weight, global_weight):
         # Huber will incentivize this to not actually converge to the mean,
-        #but rather something meanlike locally and something medianlike
+        # but rather something meanlike locally and something medianlike
         # for very large possible losses. This seems... okay - it might actually
         # be what users want.
         assert pred.shape == (self.n,)
         assert target.shape == (self.n,)
-        loss = huber_loss(pred, target, delta = 12.0)
+        loss = huber_loss(pred, target, delta=12.0)
         return 0.0015 * global_weight * weight * loss
 
-
     def loss_scorebelief_cdf_samplewise(self, pred_logits, target_probs, weight, global_weight):
-        assert pred_logits.shape == (self.n,self.scorebelief_len)
-        assert target_probs.shape == (self.n,self.scorebelief_len)
+        assert pred_logits.shape == (self.n, self.scorebelief_len)
+        assert target_probs.shape == (self.n, self.scorebelief_len)
         pred_cdf = torch.cumsum(torch.nn.functional.softmax(pred_logits, dim=1), dim=1)
         target_cdf = torch.cumsum(target_probs, dim=1)
-        loss = torch.sum(torch.square(pred_cdf-target_cdf),axis=1)
+        loss = torch.sum(torch.square(pred_cdf - target_cdf), axis=1)
         return 0.020 * global_weight * weight * loss
 
     def loss_scorebelief_pdf_samplewise(self, pred_logits, target_probs, weight, global_weight):
-        assert pred_logits.shape == (self.n,self.scorebelief_len)
-        assert target_probs.shape == (self.n,self.scorebelief_len)
+        assert pred_logits.shape == (self.n, self.scorebelief_len)
+        assert target_probs.shape == (self.n, self.scorebelief_len)
         loss = cross_entropy(pred_logits, target_probs, dim=1)
         return 0.020 * global_weight * weight * loss
 
     def loss_scorestdev_samplewise(self, pred, scorebelief_logits, global_weight):
         assert pred.shape == (self.n,)
-        assert scorebelief_logits.shape == (self.n,self.scorebelief_len)
+        assert scorebelief_logits.shape == (self.n, self.scorebelief_len)
         assert self.score_belief_offset_vector.shape == (self.scorebelief_len,)
         scorebelief_probs = torch.nn.functional.softmax(scorebelief_logits, dim=1)
-        expected_score_from_belief = torch.sum(scorebelief_probs * self.score_belief_offset_vector.view(1,-1),dim=1,keepdim=True)
-        stdev_of_belief = torch.sqrt(0.001 + torch.sum(
-            scorebelief_probs * torch.square(
-                self.score_belief_offset_vector.view(1,-1) - expected_score_from_belief
-            ),
-            dim=1
-        ))
-        loss = huber_loss(pred, stdev_of_belief, delta = 10.0)
+        expected_score_from_belief = torch.sum(
+            scorebelief_probs * self.score_belief_offset_vector.view(1, -1), dim=1, keepdim=True
+        )
+        stdev_of_belief = torch.sqrt(
+            0.001
+            + torch.sum(
+                scorebelief_probs
+                * torch.square(self.score_belief_offset_vector.view(1, -1) - expected_score_from_belief),
+                dim=1,
+            )
+        )
+        loss = huber_loss(pred, stdev_of_belief, delta=10.0)
         return 0.001 * global_weight * loss
 
     def loss_lead_samplewise(self, pred, target, weight, global_weight):
         # Huber will incentivize this to not actually converge to the mean,
-        #but rather something meanlike locally and something medianlike
+        # but rather something meanlike locally and something medianlike
         # for very large possible losses. This seems... okay - it might actually
         # be what users want.
         assert pred.shape == (self.n,)
         assert target.shape == (self.n,)
-        loss = huber_loss(pred, target, delta = 8.0)
+        loss = huber_loss(pred, target, delta=8.0)
         return 0.0060 * global_weight * weight * loss
 
     def loss_variance_time_samplewise(self, pred, target, weight, global_weight):
         assert pred.shape == (self.n,)
         assert target.shape == (self.n,)
         # Even if the training target is 0, add a tiny bit of irreducible error for regularizing the prediction.
-        loss = huber_loss(pred, target + 1.0e-5, delta = 50.0)
+        loss = huber_loss(pred, target + 1.0e-5, delta=50.0)
         return 0.0003 * global_weight * weight * loss
 
-
-    def loss_shortterm_value_error_samplewise(self, pred, td_value_pred_logits, td_value_target_probs, weight, global_weight):
-        td_value_pred_probs = torch.softmax(td_value_pred_logits[:,2,:],axis=1)
-        predvalue = (td_value_pred_probs[:,0] - td_value_pred_probs[:,1]).detach()
-        realvalue = td_value_target_probs[:,2,0] - td_value_target_probs[:,2,1]
+    def loss_shortterm_value_error_samplewise(
+        self, pred, td_value_pred_logits, td_value_target_probs, weight, global_weight
+    ):
+        td_value_pred_probs = torch.softmax(td_value_pred_logits[:, 2, :], axis=1)
+        predvalue = (td_value_pred_probs[:, 0] - td_value_pred_probs[:, 1]).detach()
+        realvalue = td_value_target_probs[:, 2, 0] - td_value_target_probs[:, 2, 1]
         # Even if the training target is 0, add a tiny bit of irreducible error for regularizing the prediction, 0.01%.
-        sqerror = torch.square(predvalue-realvalue) + 1.0e-8
-        loss = huber_loss(pred, sqerror, delta = 0.4)
+        sqerror = torch.square(predvalue - realvalue) + 1.0e-8
+        loss = huber_loss(pred, sqerror, delta=0.4)
         return 2.0 * global_weight * weight * loss
 
     def loss_shortterm_score_error_samplewise(self, pred, td_score_pred, td_score_target, weight, global_weight):
-        predscore = td_score_pred[:,2].detach()
-        realscore = td_score_target[:,2]
+        predscore = td_score_pred[:, 2].detach()
+        realscore = td_score_target[:, 2]
         # Even if the training target is 0, add a tiny bit of irreducible error for regularizing the prediction, one hundredth of a point.
-        sqerror = torch.square(predscore-realscore) + 1.0e-4
-        loss = huber_loss(pred, sqerror, delta = 100.0)
+        sqerror = torch.square(predscore - realscore) + 1.0e-4
+        loss = huber_loss(pred, sqerror, delta=100.0)
         return 0.00002 * global_weight * weight * loss
 
     def accuracy1(self, pred_logits, target_probs, weight, global_weight):
-        return torch.sum(global_weight * weight * (torch.argmax(pred_logits,dim=1) == torch.argmax(target_probs,dim=1)))
+        return torch.sum(
+            global_weight * weight * (torch.argmax(pred_logits, dim=1) == torch.argmax(target_probs, dim=1))
+        )
 
     def target_entropy(self, target_probs, weight, global_weight):
         return torch.sum(global_weight * weight * -torch.sum(target_probs * torch.log(target_probs + 1e-30), dim=-1))
 
     def square_value(self, value_logits, global_weight):
-        return torch.sum(global_weight * torch.square(torch.sum(torch.softmax(value_logits,dim=1) * constant_like([1,-1,0],global_weight), dim=1)))
+        return torch.sum(
+            global_weight
+            * torch.square(
+                torch.sum(torch.softmax(value_logits, dim=1) * constant_like([1, -1, 0], global_weight), dim=1)
+            )
+        )
 
     # Returns 0.5 times the sum of squared model weights, for each reg group of model weights
     @staticmethod
     def get_model_norms(raw_model):
-        reg_dict : Dict[str,List] = {}
+        reg_dict: Dict[str, List] = {}
         raw_model.add_reg_dict(reg_dict)
 
         device = reg_dict["normal"][0].device
         dtype = torch.float32
 
-        modelnorm_normal = torch.zeros([],device=device,dtype=dtype)
-        modelnorm_normal_gamma = torch.zeros([],device=device,dtype=dtype)
-        modelnorm_output = torch.zeros([],device=device,dtype=dtype)
-        modelnorm_noreg = torch.zeros([],device=device,dtype=dtype)
-        modelnorm_output_noreg = torch.zeros([],device=device,dtype=dtype)
+        modelnorm_normal = torch.zeros([], device=device, dtype=dtype)
+        modelnorm_normal_gamma = torch.zeros([], device=device, dtype=dtype)
+        modelnorm_output = torch.zeros([], device=device, dtype=dtype)
+        modelnorm_noreg = torch.zeros([], device=device, dtype=dtype)
+        modelnorm_output_noreg = torch.zeros([], device=device, dtype=dtype)
         for tensor in reg_dict["normal"]:
             modelnorm_normal += torch.sum(tensor * tensor)
         for tensor in reg_dict["normal_gamma"]:
@@ -326,13 +359,14 @@ class Metrics:
         modelnorm_output_noreg *= 0.5
         return (modelnorm_normal, modelnorm_normal_gamma, modelnorm_output, modelnorm_noreg, modelnorm_output_noreg)
 
-    def get_specific_norms_and_gradient_stats(self,raw_model):
+    def get_specific_norms_and_gradient_stats(self, raw_model):
         with torch.no_grad():
             params = {}
             for name, param in raw_model.named_parameters():
                 params[name] = param
 
             stats = {}
+
             def add_norm_and_grad_stats(name):
                 param = params[name]
                 if name.endswith(".weight"):
@@ -347,15 +381,27 @@ class Metrics:
                 # 1.0 means that the average squared magnitude of a parameter in this tensor is around where
                 # it would be at initialization, assuming it uses the activation that the model generally
                 # uses (e.g. relu or mish)
-                param_scale = torch.sqrt(torch.mean(torch.square(param))) / compute_gain(raw_model.activation) * math.sqrt(fanin)
+                param_scale = (
+                    torch.sqrt(torch.mean(torch.square(param))) / compute_gain(raw_model.activation) * math.sqrt(fanin)
+                )
                 stats[f"{name}.SCALE_batch"] = param_scale
 
                 # How large is the gradient, on the same scale?
-                stats[f"{name}.GRADSC_batch"] = torch.sqrt(torch.mean(torch.square(param.grad))) / compute_gain(raw_model.activation) * math.sqrt(fanin)
+                stats[f"{name}.GRADSC_batch"] = (
+                    torch.sqrt(torch.mean(torch.square(param.grad)))
+                    / compute_gain(raw_model.activation)
+                    * math.sqrt(fanin)
+                )
 
                 # And how large is the component of the gradient that is orthogonal to the overall magnitude of the parameters?
-                orthograd = param.grad - param * (torch.sum(param.grad * param) / (1e-20 + torch.sum(torch.square(param))))
-                stats[f"{name}.OGRADSC_batch"] = torch.sqrt(torch.mean(torch.square(orthograd))) / compute_gain(raw_model.activation) * math.sqrt(fanin)
+                orthograd = param.grad - param * (
+                    torch.sum(param.grad * param) / (1e-20 + torch.sum(torch.square(param)))
+                )
+                stats[f"{name}.OGRADSC_batch"] = (
+                    torch.sqrt(torch.mean(torch.square(orthograd)))
+                    / compute_gain(raw_model.activation)
+                    * math.sqrt(fanin)
+                )
 
             add_norm_and_grad_stats("blocks.1.normactconvp.conv.weight")
             add_norm_and_grad_stats("blocks.1.blockstack.0.normactconv1.conv.weight")
@@ -449,9 +495,9 @@ class Metrics:
                     variance_time_loss_scale=variance_time_loss_scale,
                     is_intermediate=True,
                 )
-                for key,value in iresults.items():
+                for key, value in iresults.items():
                     if key != "loss_sum":
-                        results["I"+key] = value
+                        results["I" + key] = value
                 results["loss_sum"] = results["loss_sum"] + intermediate_loss_scale * iresults["loss_sum"]
 
         return results
@@ -497,13 +543,13 @@ class Metrics:
         target_value_nchw = batch["valueTargetsNCHW"]
 
         mask = input_binary_nchw[:, 0, :, :].contiguous()
-        mask_sum_hw = torch.sum(mask,dim=(1,2))
+        mask_sum_hw = torch.sum(mask, dim=(1, 2))
 
         n = input_binary_nchw.shape[0]
         h = input_binary_nchw.shape[2]
         w = input_binary_nchw.shape[3]
 
-        policymask = torch.cat((mask.view(n,h*w),mask.new_ones((n,1))),dim=1)
+        policymask = torch.cat((mask.view(n, h * w), mask.new_ones((n, 1))), dim=1)
 
         target_policy_player = target_policy_ncmove[:, 0, :]
         target_policy_player = target_policy_player / torch.sum(target_policy_player, dim=1, keepdim=True)
@@ -579,8 +625,8 @@ class Metrics:
             metadata_input_nc = batch["metadataInputNC"]
             assert metadata_input_nc.shape[0] == target_weight_policy_player_soft.shape[0]
             # 151 indicates source 0 = katago
-            target_weight_policy_player_soft = target_weight_policy_player_soft * metadata_input_nc[:,151]
-            target_weight_policy_opponent_soft = target_weight_policy_opponent_soft * metadata_input_nc[:,151]
+            target_weight_policy_player_soft = target_weight_policy_player_soft * metadata_input_nc[:, 151]
+            target_weight_policy_opponent_soft = target_weight_policy_opponent_soft * metadata_input_nc[:, 151]
 
         loss_policy_player_soft = self.loss_policy_player_samplewise(
             policy_logits[:, 2, :],
@@ -610,12 +656,14 @@ class Metrics:
             # Long-term optimistic policy. Weight policy by:
             # Final game win squared (squaring discourages draws)
             win_squared = torch.square(
-                target_global_nc[:, 0] # win (or draw, weighted by draw utility)
-                + 0.5 * target_global_nc[:, 2] # noresult
+                target_global_nc[:, 0]  # win (or draw, weighted by draw utility)
+                + 0.5 * target_global_nc[:, 2]  # noresult
             )
             # Or the score outcome of the game being around 1.5 sigma more than expected
             # Add a small amount to the variance to avoid division by zero or overly small numbers
-            longterm_score_stdevs_excess = (target_global_nc[:, 3] - pred_scoremean.detach()) / torch.sqrt(torch.square(pred_scorestdev.detach()) + 0.25)
+            longterm_score_stdevs_excess = (target_global_nc[:, 3] - pred_scoremean.detach()) / torch.sqrt(
+                torch.square(pred_scorestdev.detach()) + 0.25
+            )
             target_weight_longoptimistic_policy = torch.clamp(
                 win_squared + torch.sigmoid((longterm_score_stdevs_excess - 1.5) * 3.0),
                 min=0.0,
@@ -623,8 +671,8 @@ class Metrics:
             )
             target_weight_longoptimistic_policy = (
                 target_weight_longoptimistic_policy
-                * target_weight_policy_player # game has normal target
-                * target_weight_ownership # and also actually ended in full ownership and score, not a sidepos
+                * target_weight_policy_player  # game has normal target
+                * target_weight_ownership  # and also actually ended in full ownership and score, not a sidepos
             )
             loss_longoptimistic_policy = self.loss_policy_player_samplewise(
                 policy_logits[:, 4, :],
@@ -656,19 +704,24 @@ class Metrics:
             shortterm_value_actual = target_global_nc[:, 12] - target_global_nc[:, 13]
             shortterm_value_pred = torch.nn.functional.softmax(td_value_logits[:, 2, :].detach(), dim=1)
             shortterm_value_pred = shortterm_value_pred[:, 0] - shortterm_value_pred[:, 1]
-            shortterm_value_stdevs_excess = (shortterm_value_actual - shortterm_value_pred) / torch.sqrt(pred_shortterm_value_error.detach() + 0.0001)
+            shortterm_value_stdevs_excess = (shortterm_value_actual - shortterm_value_pred) / torch.sqrt(
+                pred_shortterm_value_error.detach() + 0.0001
+            )
             # Or the shortterm score outcome being around 1.5 sigma more than expected
             # Add a small amount to the variance to avoid division by zero or overly small numbers
-            shortterm_score_stdevs_excess = (target_global_nc[:, 15] - pred_td_score[:,2].detach()) / torch.sqrt(pred_shortterm_score_error.detach() + 0.25)
+            shortterm_score_stdevs_excess = (target_global_nc[:, 15] - pred_td_score[:, 2].detach()) / torch.sqrt(
+                pred_shortterm_score_error.detach() + 0.25
+            )
             target_weight_shortoptimistic_policy = torch.clamp(
-                torch.sigmoid((shortterm_value_stdevs_excess - 1.5) * 3.0) + torch.sigmoid((shortterm_score_stdevs_excess - 1.5) * 3.0),
+                torch.sigmoid((shortterm_value_stdevs_excess - 1.5) * 3.0)
+                + torch.sigmoid((shortterm_score_stdevs_excess - 1.5) * 3.0),
                 min=0.0,
                 max=1.0,
             )
             target_weight_shortoptimistic_policy = (
                 target_weight_shortoptimistic_policy
-                * target_weight_policy_player # game has normal target
-                * target_weight_ownership # and also actually ended in full ownership and score, not a sidepos
+                * target_weight_policy_player  # game has normal target
+                * target_weight_ownership  # and also actually ended in full ownership and score, not a sidepos
             )
             loss_shortoptimistic_policy = self.loss_policy_player_samplewise(
                 policy_logits[:, 5, :],
@@ -682,18 +735,15 @@ class Metrics:
         assert target_weight_shortoptimistic_policy.shape[0] == n
         target_weight_shortoptimistic_policy_sum = (global_weight * target_weight_shortoptimistic_policy).sum()
 
-
-        loss_value = self.loss_value_samplewise(
-            value_logits, target_value, target_weight_value, global_weight
-        ).sum()
+        loss_value = self.loss_value_samplewise(value_logits, target_value, target_weight_value, global_weight).sum()
 
         loss_td_value_unsummed = self.loss_td_value_samplewise(
             td_value_logits, target_td_value, target_weight_td_value, global_weight
         )
         assert self.num_td_values == 3
-        loss_td_value1 = loss_td_value_unsummed[:,0].sum()
-        loss_td_value2 = loss_td_value_unsummed[:,1].sum()
-        loss_td_value3 = loss_td_value_unsummed[:,2].sum()
+        loss_td_value1 = loss_td_value_unsummed[:, 0].sum()
+        loss_td_value2 = loss_td_value_unsummed[:, 1].sum()
+        loss_td_value3 = loss_td_value_unsummed[:, 2].sum()
 
         loss_td_score = self.loss_td_score_samplewise(
             pred_td_score, target_td_score, target_weight_ownership, global_weight
@@ -723,7 +773,7 @@ class Metrics:
             mask_sum_hw,
             global_weight,
         ).sum()
-        (loss_seki,seki_weight_scale) = self.loss_seki_samplewise(
+        (loss_seki, seki_weight_scale) = self.loss_seki_samplewise(
             seki_logits,
             target_seki,
             target_ownership,
@@ -735,7 +785,7 @@ class Metrics:
             skip_moving_update=is_intermediate,
         )
         loss_seki = loss_seki.sum()
-        seki_weight_scale = seki_weight_scale.sum() if not isinstance(seki_weight_scale,float) else seki_weight_scale
+        seki_weight_scale = seki_weight_scale.sum() if not isinstance(seki_weight_scale, float) else seki_weight_scale
         loss_scoremean = self.loss_scoremean_samplewise(
             pred_scoremean,
             target_scoremean,
@@ -799,7 +849,7 @@ class Metrics:
                 target_qvalue_ncmove[:, 0, :] / 32000.0,
                 target_qvalue_ncmove[:, 1, :] / 60.0,
                 target_qvalue_ncmove[:, 2, :],
-                global_weight
+                global_weight,
             )
             loss_qvalues_winloss = loss_qvalues_winloss.sum()
             loss_qvalues_score = loss_qvalues_score.sum()
@@ -889,7 +939,9 @@ class Metrics:
                 global_weight,
             )
 
-            (modelnorm_normal, modelnorm_normal_gamma, modelnorm_output, modelnorm_noreg, modelnorm_output_noreg) = self.get_model_norms(raw_model)
+            (modelnorm_normal, modelnorm_normal_gamma, modelnorm_output, modelnorm_noreg, modelnorm_output_noreg) = (
+                self.get_model_norms(raw_model)
+            )
 
             extra_results = {
                 "wsum": weight * self.world_size,
@@ -903,6 +955,6 @@ class Metrics:
                 "norm_noreg_batch": modelnorm_noreg,
                 "norm_output_noreg_batch": modelnorm_output_noreg,
             }
-            for key,value in extra_results.items():
+            for key, value in extra_results.items():
                 results[key] = value
             return results

@@ -1,18 +1,17 @@
 import json
 import logging
 import os
-
-import torch
+from collections import defaultdict
 
 import packaging
 import packaging.version
-
-from collections import defaultdict
+import torch
 
 # defaultdict and float constructor are used in the ckpt for running metrics
 if packaging.version.parse(torch.__version__) > packaging.version.parse("2.4.0"):
     torch.serialization.add_safe_globals([defaultdict])
     torch.serialization.add_safe_globals([float])
+
 
 def load_model_state_dict(state_dict):
     # Strip off any "module." from when the model was saved with DDP or other things
@@ -22,10 +21,15 @@ def load_model_state_dict(state_dict):
         while key.startswith("module."):
             key = key[7:]
         # Filter out some extra keys that were present in older checkpoints
-        if "score_belief_offset_vector" in key or "score_belief_offset_bias_vector" in key or "score_belief_parity_vector" in key:
+        if (
+            "score_belief_offset_vector" in key
+            or "score_belief_offset_bias_vector" in key
+            or "score_belief_parity_vector" in key
+        ):
             continue
         model_state_dict[key] = state_dict["model"][old_key]
     return model_state_dict
+
 
 def load_swa_model_state_dict(state_dict):
     if "swa_model" not in state_dict:
@@ -33,28 +37,33 @@ def load_swa_model_state_dict(state_dict):
     swa_model_state_dict = {}
     for key in state_dict["swa_model"]:
         # Filter out some extra keys that were present in older checkpoints
-        if "score_belief_offset_vector" in key or "score_belief_offset_bias_vector" in key or "score_belief_parity_vector" in key:
+        if (
+            "score_belief_offset_vector" in key
+            or "score_belief_offset_bias_vector" in key
+            or "score_belief_parity_vector" in key
+        ):
             continue
         swa_model_state_dict[key] = state_dict["swa_model"][key]
     return swa_model_state_dict
 
 
 def load_model(checkpoint_file, use_swa, device, pos_len=19, verbose=False):
-    from ..train.model_pytorch import Model
     from torch.optim.swa_utils import AveragedModel
 
-    state_dict = torch.load(checkpoint_file,map_location="cpu")
+    from ..train.model_pytorch import Model
+
+    state_dict = torch.load(checkpoint_file, map_location="cpu")
 
     if "config" in state_dict:
         model_config = state_dict["config"]
     else:
-        config_file = os.path.join(os.path.dirname(checkpoint_file),"model.config.json")
+        config_file = os.path.join(os.path.dirname(checkpoint_file), "model.config.json")
         logging.info(f"No config in checkpoint, so loading from: {config_file}")
-        with open(config_file,"r") as f:
+        with open(config_file, "r") as f:
             model_config = json.load(f)
 
     logging.info(str(model_config))
-    model = Model(model_config,pos_len)
+    model = Model(model_config, pos_len)
     model.initialize()
 
     # Strip off any "module." from when the model was saved with DDP or other things

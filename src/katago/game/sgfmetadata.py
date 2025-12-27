@@ -1,14 +1,17 @@
 # See the equivalents in trainingwrite.h and trainingwrite.cpp in the cpp directory.
 # Translated from the c++ implementation.
 
-from dataclasses import dataclass
-from typing import ClassVar
 import datetime
 import math
-import numpy as np
 import random
+from dataclasses import dataclass
+from typing import ClassVar
+
+import numpy as np
+
 from ..game.board import Board
 from ..train import modelconfigs
+
 
 @dataclass
 class SGFMetadata:
@@ -63,38 +66,33 @@ class SGFMetadata:
     @classmethod
     def get_katago_selfplay_metadata(cls, rand: random.Random) -> "SGFMetadata":
         return SGFMetadata(
-            inverseBRank = 0,
-            inverseWRank = 0,
-            bIsUnranked = False,
-            wIsUnranked = False,
-            bRankIsUnknown = False,
-            wRankIsUnknown = False,
-            bIsHuman = False,
-            wIsHuman = False,
-
-            gameIsUnrated = False,
-            gameRatednessIsUnknown = False,
-
-            tcIsUnknown = False,
-            tcIsNone = False,
-            tcIsAbsolute = False,
-            tcIsSimple = False,
-            tcIsByoYomi = True,
-            tcIsCanadian = False,
-            tcIsFischer = False,
-
-            mainTimeSeconds = rand.choice([300,600,900,1200]),
-            periodTimeSeconds = rand.choice([10.0,15.0,30.0]),
-            byoYomiPeriods = 5,
-            canadianMoves = 0,
-
-            gameDate = datetime.date(2022, 1, 1) + datetime.timedelta(days=rand.randint(0,722)),
-            source = 0,
+            inverseBRank=0,
+            inverseWRank=0,
+            bIsUnranked=False,
+            wIsUnranked=False,
+            bRankIsUnknown=False,
+            wRankIsUnknown=False,
+            bIsHuman=False,
+            wIsHuman=False,
+            gameIsUnrated=False,
+            gameRatednessIsUnknown=False,
+            tcIsUnknown=False,
+            tcIsNone=False,
+            tcIsAbsolute=False,
+            tcIsSimple=False,
+            tcIsByoYomi=True,
+            tcIsCanadian=False,
+            tcIsFischer=False,
+            mainTimeSeconds=rand.choice([300, 600, 900, 1200]),
+            periodTimeSeconds=rand.choice([10.0, 15.0, 30.0]),
+            byoYomiPeriods=5,
+            canadianMoves=0,
+            gameDate=datetime.date(2022, 1, 1) + datetime.timedelta(days=rand.randint(0, 722)),
+            source=0,
         )
 
-
     def get_metadata_row(self, nextPlayer, boardArea) -> np.ndarray:
-        if isinstance(nextPlayer,str):
+        if isinstance(nextPlayer, str):
             if nextPlayer.lower() == "w":
                 nextPlayer = Board.WHITE
             elif nextPlayer.lower() == "b":
@@ -102,7 +100,9 @@ class SGFMetadata:
 
         # This class implements "version 1" of sgf metadata encoding, make sure channel dims match up.
         meta_encoder_version = 1
-        assert modelconfigs.get_num_meta_encoder_input_features(meta_encoder_version) == self.METADATA_INPUT_NUM_CHANNELS
+        assert (
+            modelconfigs.get_num_meta_encoder_input_features(meta_encoder_version) == self.METADATA_INPUT_NUM_CHANNELS
+        )
 
         rowMetadata = np.zeros(self.METADATA_INPUT_NUM_CHANNELS, dtype=np.float32)
 

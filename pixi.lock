@@ -130,6 +130,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/numpy-2.4.0-py313hf6604e3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/onnx-1.19.1-np2py313hc6067f8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/onnx-ir-0.1.12-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/onnxconverter-common-1.16.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/onnxruntime-1.22.2-py313h7df2e60_1_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/onnxscript-0.5.6-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openssl-3.6.0-h26f9b46_0.conda
@@ -327,6 +328,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/numpy-2.4.0-py313h16eae64_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/onnx-1.19.1-np2py313h0fff2d2_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/onnx-ir-0.1.12-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/onnxconverter-common-1.16.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/onnxruntime-1.22.2-py313hf927481_1_cpu.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/onnxscript-0.5.6-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.6.0-h5503f6c_0.conda
@@ -1615,7 +1617,7 @@ packages:
 - pypi: ./
   name: katago-onnx
   version: 0.1.0
-  sha256: 95ec3cd92bf619f8d782b70921c205e6121366c62b6fc8e198a3da143c4a7e43
+  sha256: 86e33e037b18259fb855b8524fea9cbb1cf68b62f2d17c4c0e721670fc7ba27b
   requires_dist:
   - torch
   - numpy
@@ -2710,6 +2712,21 @@ packages:
   - pkg:pypi/onnx-ir?source=hash-mapping
   size: 100630
   timestamp: 1761740327766
+- conda: https://conda.anaconda.org/conda-forge/noarch/onnxconverter-common-1.16.0-pyhd8ed1ab_0.conda
+  sha256: ffd5ed59f175914ebeddd5a54ebcdebf81194bc761a0c91ef8e3b77ecd735c75
+  md5: 5e2a5234325b5552f6a84886ecc78554
+  depends:
+  - numpy
+  - onnx
+  - packaging
+  - protobuf >=3.20.2
+  - python >=3.10
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/onnxconverter-common?source=hash-mapping
+  size: 75719
+  timestamp: 1764157622533
 - conda: https://conda.anaconda.org/conda-forge/linux-64/onnxruntime-1.22.2-py313h7df2e60_1_cpu.conda
   build_number: 1
   sha256: 244eaae7a6e9d70aecf98da8a5e6b8811e9bf946ca04add37f37f7efc1305cfb

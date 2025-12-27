@@ -1,13 +1,13 @@
 import logging
 import os
-
-import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
+import numpy as np
 import torch
 import torch.nn.functional
 
 from ..train import modelconfigs
+
 
 def read_npz_training_data(
     npz_files,
@@ -23,7 +23,7 @@ def read_npz_training_data(
     rand = np.random.default_rng(seed=list(os.urandom(12)))
     num_bin_features = modelconfigs.get_num_bin_input_features(model_config)
     num_global_features = modelconfigs.get_num_global_input_features(model_config)
-    (h_base,h_builder) = build_history_matrices(model_config, device)
+    (h_base, h_builder) = build_history_matrices(model_config, device)
 
     include_qvalues = model_config["version"] >= 16
 
@@ -45,17 +45,27 @@ def read_npz_training_data(
                 qValueTargetsNCMove = None
         del npz
 
-        binaryInputNCHW = np.unpackbits(binaryInputNCHWPacked,axis=2)
+        binaryInputNCHW = np.unpackbits(binaryInputNCHWPacked, axis=2)
         assert len(binaryInputNCHW.shape) == 3
         assert binaryInputNCHW.shape[2] == ((pos_len * pos_len + 7) // 8) * 8
-        binaryInputNCHW = binaryInputNCHW[:,:,:pos_len*pos_len]
-        binaryInputNCHW = np.reshape(binaryInputNCHW, (
-            binaryInputNCHW.shape[0], binaryInputNCHW.shape[1], pos_len, pos_len
-        )).astype(np.float32)
+        binaryInputNCHW = binaryInputNCHW[:, :, : pos_len * pos_len]
+        binaryInputNCHW = np.reshape(
+            binaryInputNCHW, (binaryInputNCHW.shape[0], binaryInputNCHW.shape[1], pos_len, pos_len)
+        ).astype(np.float32)
 
         assert binaryInputNCHW.shape[1] == num_bin_features
         assert globalInputNC.shape[1] == num_global_features
-        return (npz_file, binaryInputNCHW, globalInputNC, policyTargetsNCMove, globalTargetsNC, scoreDistrN, valueTargetsNCHW, metadataInputNC, qValueTargetsNCMove)
+        return (
+            npz_file,
+            binaryInputNCHW,
+            globalInputNC,
+            policyTargetsNCMove,
+            globalTargetsNC,
+            scoreDistrN,
+            valueTargetsNCHW,
+            metadataInputNC,
+            qValueTargetsNCMove,
+        )
 
     if not npz_files:
         return
@@ -63,8 +73,18 @@ def read_npz_training_data(
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(load_npz_file, npz_files[0])
 
-        for next_file in (npz_files[1:] + [None]):
-            (npz_file, binaryInputNCHW, globalInputNC, policyTargetsNCMove, globalTargetsNC, scoreDistrN, valueTargetsNCHW, metadataInputNC, qValueTargetsNCMove) = future.result()
+        for next_file in npz_files[1:] + [None]:
+            (
+                npz_file,
+                binaryInputNCHW,
+                globalInputNC,
+                policyTargetsNCMove,
+                globalTargetsNC,
+                scoreDistrN,
+                valueTargetsNCHW,
+                metadataInputNC,
+                qValueTargetsNCMove,
+            ) = future.result()
 
             num_samples = binaryInputNCHW.shape[0]
             # Just discard stuff that doesn't divide evenly
@@ -96,7 +116,7 @@ def read_npz_training_data(
                 )
 
                 if randomize_symmetries:
-                    symm = int(rand.integers(0,8))
+                    symm = int(rand.integers(0, 8))
                     batch_binaryInputNCHW = apply_symmetry(batch_binaryInputNCHW, symm)
                     batch_policyTargetsNCMove = apply_symmetry_policy(batch_policyTargetsNCMove, symm, pos_len)
                     batch_valueTargetsNCHW = apply_symmetry(batch_valueTargetsNCHW, symm)
@@ -110,12 +130,12 @@ def read_npz_training_data(
                     batch_qValueTargetsNCMove = batch_qValueTargetsNCMove.contiguous()
 
                 batch = dict(
-                    binaryInputNCHW = batch_binaryInputNCHW,
-                    globalInputNC = batch_globalInputNC,
-                    policyTargetsNCMove = batch_policyTargetsNCMove,
-                    globalTargetsNC = batch_globalTargetsNC,
-                    scoreDistrN = batch_scoreDistrN,
-                    valueTargetsNCHW = batch_valueTargetsNCHW,
+                    binaryInputNCHW=batch_binaryInputNCHW,
+                    globalInputNC=batch_globalInputNC,
+                    policyTargetsNCMove=batch_policyTargetsNCMove,
+                    globalTargetsNC=batch_globalTargetsNC,
+                    scoreDistrN=batch_scoreDistrN,
+                    valueTargetsNCHW=batch_valueTargetsNCHW,
                 )
                 if include_meta:
                     batch["metadataInputNC"] = batch_metadataInputNC
@@ -129,12 +149,10 @@ def apply_symmetry_policy(tensor, symm, pos_len):
     """Same as apply_symmetry but also handles the pass index"""
     batch_size = tensor.shape[0]
     channels = tensor.shape[1]
-    tensor_without_pass = tensor[:,:,:-1].view((batch_size, channels, pos_len, pos_len))
+    tensor_without_pass = tensor[:, :, :-1].view((batch_size, channels, pos_len, pos_len))
     tensor_transformed = apply_symmetry(tensor_without_pass, symm)
-    return torch.cat((
-        tensor_transformed.reshape(batch_size, channels, pos_len*pos_len),
-        tensor[:,:,-1:]
-    ), dim=2)
+    return torch.cat((tensor_transformed.reshape(batch_size, channels, pos_len * pos_len), tensor[:, :, -1:]), dim=2)
+
 
 def apply_symmetry(tensor, symm):
     """
@@ -239,16 +257,17 @@ def build_history_matrices(model_config: modelconfigs.ModelConfig, device):
     return (h_base, h_builder)
 
 
-def apply_history_matrices(model_config, batch_binaryInputNCHW, batch_globalInputNC, batch_globalTargetsNC, h_base, h_builder):
+def apply_history_matrices(
+    model_config, batch_binaryInputNCHW, batch_globalInputNC, batch_globalTargetsNC, h_base, h_builder
+):
     num_global_features = modelconfigs.get_num_global_input_features(model_config)
     # include_history = batch_globalTargetsNC[:,36:41]
-    should_stop_history = torch.rand_like(batch_globalTargetsNC[:,36:41]) >= 0.98
-    include_history = (torch.cumsum(should_stop_history,axis=1,dtype=torch.float32) <= 0.1).to(torch.float32)
+    should_stop_history = torch.rand_like(batch_globalTargetsNC[:, 36:41]) >= 0.98
+    include_history = (torch.cumsum(should_stop_history, axis=1, dtype=torch.float32) <= 0.1).to(torch.float32)
 
     # include_history: (N, 5)
     # bi * ijk -> bjk, (N, 5) * (5, n_bin, n_bin) -> (N, n_bin, n_bin)
     h_matrix = h_base + torch.einsum("bi,ijk->bjk", include_history, h_builder)
-
 
     # batch_binaryInputNCHW: (N, n_bin_in, 19, 19)
     # h_matrix: (N, n_bin_in, n_bin_out)

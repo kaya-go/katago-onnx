@@ -1,10 +1,12 @@
 from collections import deque
-from typing import Generator, TypeVar, Generic
+from typing import Generator, Generic, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class PushBackGenerator(Generic[T]):
     """Wrapper for generators that allows pushing items back on to the generator to be yielded next."""
+
     def __init__(self, generator: Generator[T, None, None]):
         self._generator = generator
         self._stack = deque()

@@ -1,13 +1,14 @@
 import copy
-import math
-import numpy as np
-import os
-import scipy.stats
-import scipy.special
 import itertools
+import math
+import os
 from abc import ABC, abstractmethod
-from typing import List, Dict, Tuple, Set, Sequence
 from dataclasses import dataclass
+from typing import Dict, List, Sequence, Set, Tuple
+
+import numpy as np
+import scipy.special
+import scipy.stats
 
 Player = str
 PlayerIdx = int
@@ -15,16 +16,17 @@ PlayerIdx = int
 ELO_PER_STRENGTH = 400.0 * math.log10(math.exp(1.0))
 P1_ADVANTAGE_NAME = "P1Advantage"
 
+
 class EloInfo:
     """Summarizes maximum likelihood Elos and uncertainties for a group of players."""
 
     def __init__(
         self,
         players: List[Player],
-        elo: Dict[Player,float],
-        elo_stderr: Dict[Player,float],
-        elo_covariance: Dict[Tuple[Player,Player],float],
-        effective_game_count: Dict[Player,float],
+        elo: Dict[Player, float],
+        elo_stderr: Dict[Player, float],
+        elo_covariance: Dict[Tuple[Player, Player], float],
+        effective_game_count: Dict[Player, float],
     ):
         self.players = players
         self.elo = elo
@@ -54,7 +56,10 @@ class EloInfo:
         """Returns an approximation of the standard error on difference in Elo between p1 and p2.
         This approximation may underestimate if the amount of data is very small."""
         return math.sqrt(
-          self.elo_covariance[(p1,p1)] - self.elo_covariance[(p1,p2)] - self.elo_covariance[(p2,p1)] + self.elo_covariance[(p2,p2)]
+            self.elo_covariance[(p1, p1)]
+            - self.elo_covariance[(p1, p2)]
+            - self.elo_covariance[(p2, p1)]
+            + self.elo_covariance[(p2, p2)]
         )
 
     def get_approx_likelihood_of_superiority(self, p1: Player, p2: Player) -> float:
@@ -62,9 +67,9 @@ class EloInfo:
         This approximation may be overconfident or inaccurate if the amount of data is very small."""
         if p1 == p2:
             return 0.5
-        mean = self.get_elo_difference(p1,p2)
-        stderr = self.get_approx_elo_difference_stderr(p1,p2)
-        return scipy.stats.t.cdf(mean/stderr,df=self.effective_game_count[p1]-1)
+        mean = self.get_elo_difference(p1, p2)
+        stderr = self.get_approx_elo_difference_stderr(p1, p2)
+        return scipy.stats.t.cdf(mean / stderr, df=self.effective_game_count[p1] - 1)
 
     def get_log10_odds_surprise_max_likelihood(self, p1: Player, p2: Player, g1: float, total: int) -> float:
         """Returns an indication of how surprised we would be for p1 to win g1 games out of total versus p2, given the maximum likeihood Elos.
@@ -77,7 +82,7 @@ class EloInfo:
         """
         if total <= 0:
             return 0
-        mean = self.get_elo_difference(p1,p2) / ELO_PER_STRENGTH
+        mean = self.get_elo_difference(p1, p2) / ELO_PER_STRENGTH
 
         max_likelihood_winprob = 1.0 / (1.0 + math.exp(-mean))
         max_likelihood_g1 = max_likelihood_winprob * total
@@ -94,11 +99,11 @@ class EloInfo:
         g1_frac = g1 - g1_floor
         if g1_frac != 0.0:
             # Average endpoints for draws
-            logxf = scipy.stats.binom.logcdf(g1_floor,total,winprob)
-            logxp1 = scipy.stats.binom.logcdf(g1_floor+1,total,winprob)
-            log_prob = scipy.special.logsumexp([logxf+math.log(1.0-g1_frac),logxp1+math.log(g1_frac)])
+            logxf = scipy.stats.binom.logcdf(g1_floor, total, winprob)
+            logxp1 = scipy.stats.binom.logcdf(g1_floor + 1, total, winprob)
+            log_prob = scipy.special.logsumexp([logxf + math.log(1.0 - g1_frac), logxp1 + math.log(g1_frac)])
         else:
-            log_prob = scipy.stats.binom.logcdf(g1,total,winprob)
+            log_prob = scipy.stats.binom.logcdf(g1, total, winprob)
 
         log_odds = log_prob - (math.log(-log_prob) if log_prob > -1e-10 else math.log(1.0 - math.exp(log_prob)))
         return -signflip * max(0.0, -log_odds / math.log(10.0))
@@ -113,8 +118,8 @@ class EloInfo:
         A value of -3.0 means that g1 is smaller larger than we would expect given the players' estimated Elos, such that a result
         that extreme or more has less than 1 : 10^3.0 odds of happening under the posterior.
         """
-        mean = self.get_elo_difference(p1,p2) / ELO_PER_STRENGTH
-        stderr = self.get_approx_elo_difference_stderr(p1,p2) / ELO_PER_STRENGTH
+        mean = self.get_elo_difference(p1, p2) / ELO_PER_STRENGTH
+        stderr = self.get_approx_elo_difference_stderr(p1, p2) / ELO_PER_STRENGTH
 
         max_likelihood_winprob = 1.0 / (1.0 + math.exp(-mean))
         max_likelihood_g1 = max_likelihood_winprob * total
@@ -127,7 +132,7 @@ class EloInfo:
 
         logw_list = []
         logwx_list = []
-        for x in np.linspace(-15.0,15.0,num=1000,endpoint=False):
+        for x in np.linspace(-15.0, 15.0, num=1000, endpoint=False):
             logw = scipy.stats.norm.logpdf(x)
             winprob = 1.0 / (1.0 + math.exp(-(mean + x * stderr)))
             # print("X", x)
@@ -138,15 +143,15 @@ class EloInfo:
             g1_frac = g1 - g1_floor
             if g1_frac != 0.0:
                 # Average endpoints for draws
-                logxf = scipy.stats.binom.logcdf(g1_floor,total,winprob)
-                logxp1 = scipy.stats.binom.logcdf(g1_floor+1,total,winprob)
-                log_prob = scipy.special.logsumexp([logxf+math.log(1.0-g1_frac),logxp1+math.log(g1_frac)])
+                logxf = scipy.stats.binom.logcdf(g1_floor, total, winprob)
+                logxp1 = scipy.stats.binom.logcdf(g1_floor + 1, total, winprob)
+                log_prob = scipy.special.logsumexp([logxf + math.log(1.0 - g1_frac), logxp1 + math.log(g1_frac)])
             else:
-                logx = scipy.stats.binom.logcdf(g1,total,winprob)
+                logx = scipy.stats.binom.logcdf(g1, total, winprob)
 
             # print("logw logx", logw, logx)
             logw_list.append(logw)
-            logwx_list.append(logw+logx)
+            logwx_list.append(logw + logx)
 
         log_wsum = scipy.special.logsumexp(logw_list)
         log_wxsum = scipy.special.logsumexp(logwx_list)
@@ -179,7 +184,7 @@ class Likelihood:
 
     def __init__(
         self,
-        playercombo: Dict[Player,float],
+        playercombo: Dict[Player, float],
         offset: float,
         weight: float,
         gamecount: float,
@@ -192,13 +197,15 @@ class Likelihood:
         self.kind = kind
         assert kind == Likelihood.SIGMOID_KIND or kind == Likelihood.GAUSSIAN_KIND, "invalid kind"
 
-    def add_idxs(self, player_to_idx: Dict[Player,PlayerIdx]):
-        self.pidxcombo : List[Tuple[PlayerIdx,float]] = [(player_to_idx[player],coeff) for (player,coeff) in self.playercombo.items()]
+    def add_idxs(self, player_to_idx: Dict[Player, PlayerIdx]):
+        self.pidxcombo: List[Tuple[PlayerIdx, float]] = [
+            (player_to_idx[player], coeff) for (player, coeff) in self.playercombo.items()
+        ]
 
     LOG_ONE_OVER_SQRT_TWO_PI = math.log(1.0 / math.sqrt(2.0 * math.pi))
 
     def get_loglikelihood(self, strengths: np.array) -> float:
-        strength_total = self.offset + sum(strengths[pidx] * coeff for (pidx,coeff) in self.pidxcombo)
+        strength_total = self.offset + sum(strengths[pidx] * coeff for (pidx, coeff) in self.pidxcombo)
         if self.kind == Likelihood.SIGMOID_KIND:
             if strength_total < -40:
                 return strength_total
@@ -207,38 +214,40 @@ class Likelihood:
             return self.weight * (Likelihood.LOG_ONE_OVER_SQRT_TWO_PI - 0.5 * strength_total * strength_total)
 
     def accum_dloglikelihood_dstrength(self, strengths: np.array, accum: np.array):
-        strength_total = self.offset + sum(strengths[pidx] * coeff for (pidx,coeff) in self.pidxcombo)
+        strength_total = self.offset + sum(strengths[pidx] * coeff for (pidx, coeff) in self.pidxcombo)
         if self.kind == Likelihood.SIGMOID_KIND:
             dloglikelihood_dstrength_total = self.weight / (1.0 + math.exp(strength_total))
         else:
             dloglikelihood_dstrength_total = -self.weight * strength_total
-        for (pidx,coeff) in self.pidxcombo:
+        for pidx, coeff in self.pidxcombo:
             accum[pidx] += coeff * dloglikelihood_dstrength_total
 
     def accum_d2loglikelihood_dstrength2(self, strengths: np.array, accum: np.array):
-        strength_total = self.offset + sum(strengths[pidx] * coeff for (pidx,coeff) in self.pidxcombo)
+        strength_total = self.offset + sum(strengths[pidx] * coeff for (pidx, coeff) in self.pidxcombo)
         if self.kind == Likelihood.SIGMOID_KIND:
             denom = math.exp(-0.5 * strength_total) + math.exp(0.5 * strength_total)
             d2loglikelihood_dstrength_total2 = -self.weight / (denom * denom)
         else:
             d2loglikelihood_dstrength_total2 = -self.weight
 
-        for (pidx1,coeff1) in self.pidxcombo:
-            for (pidx2,coeff2) in self.pidxcombo:
-                accum[pidx1,pidx2] += coeff1 * coeff2 * d2loglikelihood_dstrength_total2
+        for pidx1, coeff1 in self.pidxcombo:
+            for pidx2, coeff2 in self.pidxcombo:
+                accum[pidx1, pidx2] += coeff1 * coeff2 * d2loglikelihood_dstrength_total2
 
-    def accum_d2loglikelihood_dstrength2_scalepow(self, strengths: np.array, accum: np.array, scale: float, power: float):
-        strength_total = self.offset + sum(strengths[pidx] * coeff for (pidx,coeff) in self.pidxcombo)
+    def accum_d2loglikelihood_dstrength2_scalepow(
+        self, strengths: np.array, accum: np.array, scale: float, power: float
+    ):
+        strength_total = self.offset + sum(strengths[pidx] * coeff for (pidx, coeff) in self.pidxcombo)
         if self.kind == Likelihood.SIGMOID_KIND:
             denom = math.exp(-0.5 * strength_total) + math.exp(0.5 * strength_total)
             d2loglikelihood_dstrength_total2 = -self.weight / (denom * denom)
         else:
             d2loglikelihood_dstrength_total2 = -self.weight
 
-        for (pidx1,coeff1) in self.pidxcombo:
-            for (pidx2,coeff2) in self.pidxcombo:
+        for pidx1, coeff1 in self.pidxcombo:
+            for pidx2, coeff2 in self.pidxcombo:
                 x = coeff1 * coeff2 * d2loglikelihood_dstrength_total2
-                accum[pidx1,pidx2] += scale * (x ** power)
+                accum[pidx1, pidx2] += scale * (x**power)
 
 
 def likelihood_of_games(
@@ -281,40 +290,49 @@ def likelihood_of_games(
     if num_games > 0.0:
         if not include_first_player_advantage:
             if p1_won_proportion > 0.0:
-                ret.append(Likelihood(
-                    playercombo={p1: 1.0, p2: -1.0},
-                    offset=0.0,
-                    weight=p1_won_proportion*num_games,
-                    gamecount=p1_won_proportion*num_games,
-                    kind=Likelihood.SIGMOID_KIND
-                ))
+                ret.append(
+                    Likelihood(
+                        playercombo={p1: 1.0, p2: -1.0},
+                        offset=0.0,
+                        weight=p1_won_proportion * num_games,
+                        gamecount=p1_won_proportion * num_games,
+                        kind=Likelihood.SIGMOID_KIND,
+                    )
+                )
             if p1_won_proportion < 1.0:
-                ret.append(Likelihood(
-                    playercombo={p2: 1.0, p1: -1.0},
-                    offset=0.0,
-                    weight=(1.0-p1_won_proportion)*num_games,
-                    gamecount=(1.0-p1_won_proportion)*num_games,
-                    kind=Likelihood.SIGMOID_KIND
-                ))
+                ret.append(
+                    Likelihood(
+                        playercombo={p2: 1.0, p1: -1.0},
+                        offset=0.0,
+                        weight=(1.0 - p1_won_proportion) * num_games,
+                        gamecount=(1.0 - p1_won_proportion) * num_games,
+                        kind=Likelihood.SIGMOID_KIND,
+                    )
+                )
         else:
             if p1_won_proportion > 0.0:
-                ret.append(Likelihood(
-                    playercombo={p1: 1.0, p2: -1.0, P1_ADVANTAGE_NAME: 1.0},
-                    offset=0.0,
-                    weight=p1_won_proportion*num_games,
-                    gamecount=p1_won_proportion*num_games,
-                    kind=Likelihood.SIGMOID_KIND
-                ))
+                ret.append(
+                    Likelihood(
+                        playercombo={p1: 1.0, p2: -1.0, P1_ADVANTAGE_NAME: 1.0},
+                        offset=0.0,
+                        weight=p1_won_proportion * num_games,
+                        gamecount=p1_won_proportion * num_games,
+                        kind=Likelihood.SIGMOID_KIND,
+                    )
+                )
             if p1_won_proportion < 1.0:
-                ret.append(Likelihood(
-                    playercombo={p2: 1.0, p1: -1.0, P1_ADVANTAGE_NAME: -1.0},
-                    offset=0.0,
-                    weight=(1.0-p1_won_proportion)*num_games,
-                    gamecount=(1.0-p1_won_proportion)*num_games,
-                    kind=Likelihood.SIGMOID_KIND
-                ))
+                ret.append(
+                    Likelihood(
+                        playercombo={p2: 1.0, p1: -1.0, P1_ADVANTAGE_NAME: -1.0},
+                        offset=0.0,
+                        weight=(1.0 - p1_won_proportion) * num_games,
+                        gamecount=(1.0 - p1_won_proportion) * num_games,
+                        kind=Likelihood.SIGMOID_KIND,
+                    )
+                )
 
     return ret
+
 
 def make_single_player_prior(
     p1: Player,
@@ -333,20 +351,24 @@ def make_single_player_prior(
     assert num_games >= 0.0
     assert np.isfinite(elo)
     if num_games > 0.0:
-        ret.append(Likelihood(
-            playercombo={p1: 1.0},
-            offset=(-elo / ELO_PER_STRENGTH),
-            weight=0.5*num_games,
-            gamecount=0.5*num_games,
-            kind=Likelihood.SIGMOID_KIND
-        ))
-        ret.append(Likelihood(
-            playercombo={p1: -1.0},
-            offset=(elo / ELO_PER_STRENGTH),
-            weight=0.5*num_games,
-            gamecount=0.5*num_games,
-            kind=Likelihood.SIGMOID_KIND
-        ))
+        ret.append(
+            Likelihood(
+                playercombo={p1: 1.0},
+                offset=(-elo / ELO_PER_STRENGTH),
+                weight=0.5 * num_games,
+                gamecount=0.5 * num_games,
+                kind=Likelihood.SIGMOID_KIND,
+            )
+        )
+        ret.append(
+            Likelihood(
+                playercombo={p1: -1.0},
+                offset=(elo / ELO_PER_STRENGTH),
+                weight=0.5 * num_games,
+                gamecount=0.5 * num_games,
+                kind=Likelihood.SIGMOID_KIND,
+            )
+        )
     return ret
 
 
@@ -372,14 +394,16 @@ def make_sequential_prior(
     if len(players) < 1:
         return ret
 
-    for i in range(len(players)-1):
-        ret.extend(likelihood_of_games(
-            p1=players[i],
-            p2=players[i+1],
-            num_games=num_games,
-            p1_won_proportion=0.5,
-            include_first_player_advantage=False,
-        ))
+    for i in range(len(players) - 1):
+        ret.extend(
+            likelihood_of_games(
+                p1=players[i],
+                p2=players[i + 1],
+                num_games=num_games,
+                p1_won_proportion=0.5,
+                include_first_player_advantage=False,
+            )
+        )
     return ret
 
 
@@ -398,14 +422,16 @@ def make_center_elos_prior(
     ret = []
     assert np.isfinite(elo)
     assert len(set(players)) == len(players), "players must not contain any duplicates"
-    playercombo = { player: 1.0 for player in players }
-    ret.append(Likelihood(
-        playercombo=playercombo,
-        offset=-len(players) * elo / ELO_PER_STRENGTH,
-        weight=0.001,
-        gamecount=0.0,
-        kind=Likelihood.GAUSSIAN_KIND
-    ))
+    playercombo = {player: 1.0 for player in players}
+    ret.append(
+        Likelihood(
+            playercombo=playercombo,
+            offset=-len(players) * elo / ELO_PER_STRENGTH,
+            weight=0.001,
+            gamecount=0.0,
+            kind=Likelihood.GAUSSIAN_KIND,
+        )
+    )
     return ret
 
 
@@ -461,7 +487,7 @@ def compute_elos(
         players.extend(d.playercombo.keys())
     players = list(set(players))
     players.sort()
-    player_to_idx = { player: i for (i,player) in enumerate(players) }
+    player_to_idx = {player: i for (i, player) in enumerate(players)}
 
     data = [copy.copy(d) for d in data]
     for d in data:
@@ -477,17 +503,17 @@ def compute_elos(
 
     # Gauss newton
     def find_ascent_vector(strengths: np.array) -> np.array:
-        dloglikelihood_dstrength = np.zeros(num_players,dtype=np.float64)
-        d2loglikelihood_dstrength2 = np.zeros((num_players,num_players),dtype=np.float64)
+        dloglikelihood_dstrength = np.zeros(num_players, dtype=np.float64)
+        d2loglikelihood_dstrength2 = np.zeros((num_players, num_players), dtype=np.float64)
 
         for d in data:
             d.accum_dloglikelihood_dstrength(strengths, dloglikelihood_dstrength)
             d.accum_d2loglikelihood_dstrength2(strengths, d2loglikelihood_dstrength2)
 
-        ascent = -np.linalg.solve(d2loglikelihood_dstrength2,dloglikelihood_dstrength)
+        ascent = -np.linalg.solve(d2loglikelihood_dstrength2, dloglikelihood_dstrength)
         return ascent
 
-    def line_search_ascend(strengths: np.array, cur_loglikelihood: float) -> Tuple[np.array,float]:
+    def line_search_ascend(strengths: np.array, cur_loglikelihood: float) -> Tuple[np.array, float]:
         ascent = find_ascent_vector(strengths)
         # Try up to this many times to find an improvement
         for i in range(30):
@@ -497,9 +523,9 @@ def compute_elos(
                 return (new_strengths, new_loglikelihood)
             # Shrink ascent step and try again
             ascent *= 0.6
-        return (strengths,cur_loglikelihood)
+        return (strengths, cur_loglikelihood)
 
-    strengths = np.zeros(num_players,dtype=np.float64)
+    strengths = np.zeros(num_players, dtype=np.float64)
     loglikelihood = compute_loglikelihood(strengths)
     iters_since_big_change = 0
     last_elo_change = None
@@ -521,33 +547,39 @@ def compute_elos(
         if iters_since_big_change > 3:
             break
 
-
-    d2loglikelihood_dstrength2 = np.zeros((num_players,num_players),dtype=np.float64)
+    d2loglikelihood_dstrength2 = np.zeros((num_players, num_players), dtype=np.float64)
     for d in data:
         d.accum_d2loglikelihood_dstrength2(strengths, d2loglikelihood_dstrength2)
     strength_precision = -d2loglikelihood_dstrength2
     elo_precision = strength_precision / (ELO_PER_STRENGTH * ELO_PER_STRENGTH)
     elo_covariance = np.linalg.inv(elo_precision)
 
-    sqrt_ess_numerator = np.zeros((num_players,num_players),dtype=np.float64)
-    ess_denominator = np.zeros((num_players,num_players),dtype=np.float64)
+    sqrt_ess_numerator = np.zeros((num_players, num_players), dtype=np.float64)
+    ess_denominator = np.zeros((num_players, num_players), dtype=np.float64)
     for d in data:
         if d.gamecount > 0.0:
-            d.accum_d2loglikelihood_dstrength2_scalepow(strengths, sqrt_ess_numerator, scale = 1.0, power=1.0)
-            d.accum_d2loglikelihood_dstrength2_scalepow(strengths, ess_denominator, scale = 1.0 / d.gamecount, power=2.0)
+            d.accum_d2loglikelihood_dstrength2_scalepow(strengths, sqrt_ess_numerator, scale=1.0, power=1.0)
+            d.accum_d2loglikelihood_dstrength2_scalepow(strengths, ess_denominator, scale=1.0 / d.gamecount, power=2.0)
 
     info = EloInfo(
-      players = players,
-      elo = { player: ELO_PER_STRENGTH * strengths[player_to_idx[player]] for player in players },
-      elo_stderr = { player: math.sqrt(1.0 / elo_precision[player_to_idx[player],player_to_idx[player]]) for player in players },
-      elo_covariance = { (p1,p2): elo_covariance[player_to_idx[p1],player_to_idx[p2]] for p1 in players for p2 in players },
-      effective_game_count = {
-          player: (np.square(sqrt_ess_numerator[player_to_idx[player],player_to_idx[player]]) /
-                   ess_denominator[player_to_idx[player],player_to_idx[player]])
-          for player in players
-      },
+        players=players,
+        elo={player: ELO_PER_STRENGTH * strengths[player_to_idx[player]] for player in players},
+        elo_stderr={
+            player: math.sqrt(1.0 / elo_precision[player_to_idx[player], player_to_idx[player]]) for player in players
+        },
+        elo_covariance={
+            (p1, p2): elo_covariance[player_to_idx[p1], player_to_idx[p2]] for p1 in players for p2 in players
+        },
+        effective_game_count={
+            player: (
+                np.square(sqrt_ess_numerator[player_to_idx[player], player_to_idx[player]])
+                / ess_denominator[player_to_idx[player], player_to_idx[player]]
+            )
+            for player in players
+        },
     )
     return info
+
 
 def has_only_factors_of_2_and_3(n: int) -> bool:
     while n > 1:
@@ -559,6 +591,7 @@ def has_only_factors_of_2_and_3(n: int) -> bool:
             return False
     return True
 
+
 @dataclass
 class GameRecord:
     player1: str
@@ -567,8 +600,8 @@ class GameRecord:
     loss: int = 0
     draw: int = 0
 
-class GameResultSummary:
 
+class GameResultSummary:
     def __init__(
         self,
         elo_prior_games: float,
@@ -577,7 +610,7 @@ class GameResultSummary:
         self.results = {}  # dict of { (player1_name, player2_name) : GameRecord }
 
         self._all_game_files = set()
-        self._elo_prior_games = elo_prior_games # number of games for bayesian prior around Elo 0
+        self._elo_prior_games = elo_prior_games  # number of games for bayesian prior around Elo 0
         self._estimate_first_player_advantage = estimate_first_player_advantage
         self._elo_info = None
         self._game_count = 0
@@ -589,7 +622,7 @@ class GameResultSummary:
     def add_game_record(self, record: GameRecord):
         """Add game record to results."""
         if (record.player1, record.player2) not in self.results:
-            self.results[(record.player1, record.player2)] = GameRecord(player1=record.player1,player2=record.player2)
+            self.results[(record.player1, record.player2)] = GameRecord(player1=record.player1, player2=record.player2)
         self.results[(record.player1, record.player2)].win += record.win
         self.results[(record.player1, record.player2)].loss += record.loss
         self.results[(record.player1, record.player2)].draw += record.draw
@@ -619,23 +652,30 @@ class GameResultSummary:
         for player in real_players:
             los_row = []
             for player2 in real_players:
-                los = elo_info.get_approx_likelihood_of_superiority(player,player2)
-                los_row.append(f"{los*100:.2f}")
+                los = elo_info.get_approx_likelihood_of_superiority(player, player2)
+                los_row.append(f"{los * 100:.2f}")
             los_matrix.append(los_row)
-        self._print_matrix(real_players,los_matrix)
+        self._print_matrix(real_players, los_matrix)
 
         surprise_matrix = []
         for pla1 in real_players:
             row = []
             for pla2 in real_players:
-                if (pla1 == pla2):
+                if pla1 == pla2:
                     row.append("-")
                     continue
                 else:
-                    pla1_pla2 = self.results[(pla1, pla2)] if (pla1, pla2) in self.results else GameRecord(pla1,pla2)
-                    pla2_pla1 = self.results[(pla2, pla1)] if (pla2, pla1) in self.results else GameRecord(pla2,pla1)
+                    pla1_pla2 = self.results[(pla1, pla2)] if (pla1, pla2) in self.results else GameRecord(pla1, pla2)
+                    pla2_pla1 = self.results[(pla2, pla1)] if (pla2, pla1) in self.results else GameRecord(pla2, pla1)
                     win = pla1_pla2.win + pla2_pla1.loss + 0.5 * (pla1_pla2.draw + pla2_pla1.draw)
-                    total = pla1_pla2.win + pla2_pla1.win + pla1_pla2.loss + pla2_pla1.loss + pla1_pla2.draw + pla2_pla1.draw
+                    total = (
+                        pla1_pla2.win
+                        + pla2_pla1.win
+                        + pla1_pla2.loss
+                        + pla2_pla1.loss
+                        + pla1_pla2.draw
+                        + pla2_pla1.draw
+                    )
                     surprise = elo_info.get_log10_odds_surprise_max_likelihood(pla1, pla2, win, total)
                     if total <= 0:
                         row.append("-")
@@ -646,7 +686,7 @@ class GameResultSummary:
         print("E.g. +3.0 means a 1:1000 unexpected good performance by row vs column.")
         print("E.g. -4.0 means a 1:10000 unexpected bad performance by row vs column.")
         print("Extreme numbers may indicate rock/paper/scissors, or Elo is not a good model for the data.")
-        self._print_matrix(real_players,surprise_matrix)
+        self._print_matrix(real_players, surprise_matrix)
 
         print(f"Used a prior of {self._elo_prior_games} games worth that each player is near Elo 0.")
 
@@ -656,10 +696,10 @@ class GameResultSummary:
     def get_game_results(self) -> Dict:
         """Return a dictionary of game results as { (player1_name, player2_name) : GameRecord }
 
-          You can retrieve results by player's name like:
-          results[(player1_name, player2_name)].win
-          results[(player1_name, player2_name)].loss
-          results[(player1_name, player2_name)].draw
+        You can retrieve results by player's name like:
+        results[(player1_name, player2_name)].win
+        results[(player1_name, player2_name)].loss
+        results[(player1_name, player2_name)].draw
         """
         return self.results
 
@@ -692,10 +732,18 @@ class GameResultSummary:
         files = []
         if os.path.isdir(input_file_or_dir):
             if recursive:
-                for (dirpath, dirnames, filenames) in os.walk(input_file_or_dir):
-                    files += [os.path.join(dirpath, file) for file in filenames if self.is_game_file(os.path.join(dirpath, file))]
+                for dirpath, dirnames, filenames in os.walk(input_file_or_dir):
+                    files += [
+                        os.path.join(dirpath, file)
+                        for file in filenames
+                        if self.is_game_file(os.path.join(dirpath, file))
+                    ]
             else:
-                files = [os.path.join(input_file_or_dir, file) for file in os.listdir(input_file_or_dir) if self.is_game_file(os.path.join(input_file_or_dir, file))]
+                files = [
+                    os.path.join(input_file_or_dir, file)
+                    for file in os.listdir(input_file_or_dir)
+                    if self.is_game_file(os.path.join(input_file_or_dir, file))
+                ]
         else:
             if self.is_game_file(input_file_or_dir):
                 files.append(input_file_or_dir)
@@ -725,7 +773,7 @@ class GameResultSummary:
         data = []
         for pla_first in pla_names:
             for pla_second in pla_names:
-                if (pla_first == pla_second):
+                if pla_first == pla_second:
                     continue
                 else:
                     if (pla_first, pla_second) not in self.results:
@@ -738,24 +786,26 @@ class GameResultSummary:
 
                     win = record.win + 0.5 * record.draw
                     winrate = win / total
-                    data.extend(likelihood_of_games(
-                        pla_first,
-                        pla_second,
-                        total,
-                        winrate,
-                        include_first_player_advantage=self._estimate_first_player_advantage
-                    ))
+                    data.extend(
+                        likelihood_of_games(
+                            pla_first,
+                            pla_second,
+                            total,
+                            winrate,
+                            include_first_player_advantage=self._estimate_first_player_advantage,
+                        )
+                    )
 
         for pla in pla_names:
-            data.extend(make_single_player_prior(pla, self._elo_prior_games,0))
-        data.extend(make_center_elos_prior(list(pla_names),0)) # Add this in case user put elo_prior_games = 0
+            data.extend(make_single_player_prior(pla, self._elo_prior_games, 0))
+        data.extend(make_center_elos_prior(list(pla_names), 0))  # Add this in case user put elo_prior_games = 0
         if self._estimate_first_player_advantage:
             data.extend(make_single_player_prior(P1_ADVANTAGE_NAME, (1.0 + self._elo_prior_games) * 2.0, 0))
 
         info = compute_elos(data, verbose=True)
         return info
 
-    def _print_matrix(self,pla_names,results_matrix):
+    def _print_matrix(self, pla_names, results_matrix):
         per_elt_space = 2
         for sublist in results_matrix:
             for elt in sublist:
@@ -767,8 +817,8 @@ class GameResultSummary:
         if per_name_space > per_elt_space:
             per_elt_space += 1
 
-        row_format = f"{{:>{per_name_space}}}" +   f"{{:>{per_elt_space}}}" * len(results_matrix)
-        print(row_format.format("", *[name[:per_elt_space-2] for name in pla_names]))
+        row_format = f"{{:>{per_name_space}}}" + f"{{:>{per_elt_space}}}" * len(results_matrix)
+        print(row_format.format("", *[name[: per_elt_space - 2] for name in pla_names]))
         for name, row in zip(pla_names, results_matrix):
             print(row_format.format(name, *row))
 
@@ -778,12 +828,19 @@ class GameResultSummary:
         for pla1 in pla_names:
             total = 0
             for pla2 in pla_names:
-                if (pla1 == pla2):
+                if pla1 == pla2:
                     continue
                 else:
-                    pla1_pla2 = self.results[(pla1, pla2)] if (pla1, pla2) in self.results else GameRecord(pla1,pla2)
-                    pla2_pla1 = self.results[(pla2, pla1)] if (pla2, pla1) in self.results else GameRecord(pla2,pla1)
-                    total += pla1_pla2.win + pla2_pla1.win + pla1_pla2.loss + pla2_pla1.loss + pla1_pla2.draw + pla2_pla1.draw
+                    pla1_pla2 = self.results[(pla1, pla2)] if (pla1, pla2) in self.results else GameRecord(pla1, pla2)
+                    pla2_pla1 = self.results[(pla2, pla1)] if (pla2, pla1) in self.results else GameRecord(pla2, pla1)
+                    total += (
+                        pla1_pla2.win
+                        + pla2_pla1.win
+                        + pla1_pla2.loss
+                        + pla2_pla1.loss
+                        + pla1_pla2.draw
+                        + pla2_pla1.draw
+                    )
             print(f"{pla1}: {total:.1f}")
 
         print("Wins by row player against column player:")
@@ -791,38 +848,53 @@ class GameResultSummary:
         for pla1 in pla_names:
             row = []
             for pla2 in pla_names:
-                if (pla1 == pla2):
+                if pla1 == pla2:
                     row.append("-")
                     continue
                 else:
-                    pla1_pla2 = self.results[(pla1, pla2)] if (pla1, pla2) in self.results else GameRecord(pla1,pla2)
-                    pla2_pla1 = self.results[(pla2, pla1)] if (pla2, pla1) in self.results else GameRecord(pla2,pla1)
+                    pla1_pla2 = self.results[(pla1, pla2)] if (pla1, pla2) in self.results else GameRecord(pla1, pla2)
+                    pla2_pla1 = self.results[(pla2, pla1)] if (pla2, pla1) in self.results else GameRecord(pla2, pla1)
                     win = pla1_pla2.win + pla2_pla1.loss + 0.5 * (pla1_pla2.draw + pla2_pla1.draw)
-                    total = pla1_pla2.win + pla2_pla1.win + pla1_pla2.loss + pla2_pla1.loss + pla1_pla2.draw + pla2_pla1.draw
+                    total = (
+                        pla1_pla2.win
+                        + pla2_pla1.win
+                        + pla1_pla2.loss
+                        + pla2_pla1.loss
+                        + pla1_pla2.draw
+                        + pla2_pla1.draw
+                    )
                     row.append(f"{win:.1f}/{total:.1f}")
             result_matrix.append(row)
-        self._print_matrix(pla_names,result_matrix)
+        self._print_matrix(pla_names, result_matrix)
 
         print("Win% by row player against column player:")
         result_matrix = []
         for pla1 in pla_names:
             row = []
             for pla2 in pla_names:
-                if (pla1 == pla2):
+                if pla1 == pla2:
                     row.append("-")
                     continue
                 else:
-                    pla1_pla2 = self.results[(pla1, pla2)] if (pla1, pla2) in self.results else GameRecord(pla1,pla2)
-                    pla2_pla1 = self.results[(pla2, pla1)] if (pla2, pla1) in self.results else GameRecord(pla2,pla1)
+                    pla1_pla2 = self.results[(pla1, pla2)] if (pla1, pla2) in self.results else GameRecord(pla1, pla2)
+                    pla2_pla1 = self.results[(pla2, pla1)] if (pla2, pla1) in self.results else GameRecord(pla2, pla1)
                     win = pla1_pla2.win + pla2_pla1.loss + 0.5 * (pla1_pla2.draw + pla2_pla1.draw)
-                    total = pla1_pla2.win + pla2_pla1.win + pla1_pla2.loss + pla2_pla1.loss + pla1_pla2.draw + pla2_pla1.draw
+                    total = (
+                        pla1_pla2.win
+                        + pla2_pla1.win
+                        + pla1_pla2.loss
+                        + pla2_pla1.loss
+                        + pla1_pla2.draw
+                        + pla2_pla1.draw
+                    )
                     if total <= 0:
                         row.append("-")
                     else:
-                        row.append(f"{win/total*100.0:.1f}%")
+                        row.append(f"{win / total * 100.0:.1f}%")
             result_matrix.append(row)
 
-        self._print_matrix(pla_names,result_matrix)
+        self._print_matrix(pla_names, result_matrix)
+
 
 # Testing code
 if __name__ == "__main__":
@@ -845,11 +917,8 @@ if __name__ == "__main__":
         elo_prior_games=1.0,
         estimate_first_player_advantage=False,
     )
-    summary.add_game_record(GameRecord("Alice","Bob",win=12,loss=6,draw=0))
-    summary.add_game_record(GameRecord("Bob","Carol",win=12,loss=6,draw=0))
-    summary.add_game_record(GameRecord("Carol","Dan",win=36,loss=18,draw=0))
-    summary.add_game_record(GameRecord("Dan","Eve",win=48,loss=24,draw=0))
+    summary.add_game_record(GameRecord("Alice", "Bob", win=12, loss=6, draw=0))
+    summary.add_game_record(GameRecord("Bob", "Carol", win=12, loss=6, draw=0))
+    summary.add_game_record(GameRecord("Carol", "Dan", win=36, loss=18, draw=0))
+    summary.add_game_record(GameRecord("Dan", "Eve", win=48, loss=24, draw=0))
     summary.print_elos()
-
-
-

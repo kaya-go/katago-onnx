@@ -1,8 +1,8 @@
-
 from sgfmill import sgf as Sgf
 from sgfmill import sgf_properties as Sgf_properties
 
 from ..game.board import Board
+
 
 class Metadata:
     def __init__(self, size, bname, wname, brank, wrank, komi, handicap):
@@ -14,10 +14,11 @@ class Metadata:
         self.komi = komi
         self.handicap = handicap
 
-#Returns (metadata, list of setup stones, list of move stones)
-#Setup and move stones are both pairs of (pla,loc)
+
+# Returns (metadata, list of setup stones, list of move stones)
+# Setup and move stones are both pairs of (pla,loc)
 def load_sgf_moves_exn(path):
-    sgf_file = open(path,"rb")
+    sgf_file = open(path, "rb")
     contents = sgf_file.read()
     sgf_file.close()
 
@@ -28,18 +29,18 @@ def load_sgf_moves_exn(path):
     ab, aw, ae = root.get_setup_stones()
     setup = []
     if ab or aw:
-        for (row,col) in ab:
-            loc = Board.loc_static(col,size-1-row,size)
-            setup.append((Board.BLACK,loc))
-        for (row,col) in aw:
-            loc = Board.loc_static(col,size-1-row,size)
-            setup.append((Board.WHITE,loc))
+        for row, col in ab:
+            loc = Board.loc_static(col, size - 1 - row, size)
+            setup.append((Board.BLACK, loc))
+        for row, col in aw:
+            loc = Board.loc_static(col, size - 1 - row, size)
+            setup.append((Board.WHITE, loc))
 
-        color,raw = root.get_raw_move()
+        color, raw = root.get_raw_move()
         if color is not None:
             raise Exception("Found both setup stones and normal moves in root node")
 
-    #Walk down the leftmost branch and assume that this is the game
+    # Walk down the leftmost branch and assume that this is the game
     moves = []
     prev_pla = None
     seen_white_moves = False
@@ -49,48 +50,48 @@ def load_sgf_moves_exn(path):
         if node.has_setup_stones():
             raise Exception("Found setup stones after the root node")
 
-        color,raw = node.get_raw_move()
+        color, raw = node.get_raw_move()
         if color is None:
             raise Exception("Found node without move color")
 
-        if color == 'b':
+        if color == "b":
             pla = Board.BLACK
-        elif color == 'w':
+        elif color == "w":
             pla = Board.WHITE
         else:
             raise Exception("Invalid move color: " + color)
 
         rc = Sgf_properties.interpret_go_point(raw, size)
-        if rc is None: #pass
+        if rc is None:  # pass
             loc = Board.PASS_LOC
         else:
-            (row,col) = rc
-            loc = Board.loc_static(col,size-1-row,size)
+            (row, col) = rc
+            loc = Board.loc_static(col, size - 1 - row, size)
 
-        #Forbid consecutive moves by the same player, unless the previous player was black and we've seen no white moves yet (handicap setup)
+        # Forbid consecutive moves by the same player, unless the previous player was black and we've seen no white moves yet (handicap setup)
         if pla == prev_pla and not (prev_pla == Board.BLACK and not seen_white_moves):
             raise Exception("Multiple moves in a row by same player")
-        moves.append((pla,loc))
+        moves.append((pla, loc))
 
         prev_pla = pla
         if pla == Board.WHITE:
             seen_white_moves = True
 
-    #If there are multiple black moves in a row at the start, assume they are more handicap stones
+    # If there are multiple black moves in a row at the start, assume they are more handicap stones
     first_white_move_idx = 0
     while first_white_move_idx < len(moves) and moves[first_white_move_idx][0] == Board.BLACK:
         first_white_move_idx += 1
     if first_white_move_idx >= 2:
-        setup.extend((pla,loc) for (pla,loc) in moves[:first_white_move_idx] if loc is not None)
+        setup.extend((pla, loc) for (pla, loc) in moves[:first_white_move_idx] if loc is not None)
         moves = moves[first_white_move_idx:]
 
     bname = root.get("PB")
     wname = root.get("PW")
-    brank = (root.get("BR") if root.has_property("BR") else None)
-    wrank = (root.get("WR") if root.has_property("WR") else None)
-    komi = (root.get("KM") if root.has_property("KM") else None)
-    rulesstr = (root.get("RU") if root.has_property("RU") else None)
-    handicap = (root.get("HA") if root.has_property("HA") else None)
+    brank = root.get("BR") if root.has_property("BR") else None
+    wrank = root.get("WR") if root.has_property("WR") else None
+    komi = root.get("KM") if root.has_property("KM") else None
+    rulesstr = root.get("RU") if root.has_property("RU") else None
+    handicap = root.get("HA") if root.has_property("HA") else None
 
     rules = None
     if rulesstr is not None:
@@ -101,7 +102,7 @@ def load_sgf_moves_exn(path):
                 "multiStoneSuicideLegal": False,
                 "encorePhase": 0,
                 "passWouldEndPhase": False,
-                "whiteKomi": komi
+                "whiteKomi": komi,
             }
         elif rulesstr.lower() == "chinese":
             rules = {
@@ -110,7 +111,7 @@ def load_sgf_moves_exn(path):
                 "multiStoneSuicideLegal": False,
                 "encorePhase": 0,
                 "passWouldEndPhase": False,
-                "whiteKomi": komi
+                "whiteKomi": komi,
             }
         elif rulesstr.startswith("ko"):
             rules = {}
