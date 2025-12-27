@@ -86,10 +86,11 @@ def convert_katago_torch_to_onnx(
     print(f"Converting to FP16: {model_fp16}...")
 
     onnx_model = onnx.load(str(model_fp32))
-    # Keep inputs as FP32 for compatibility, only convert internal computations
+    # Convert entire graph to FP16 including inputs/outputs
+    # Note: Inference code must handle float16 I/O (e.g., using @petamoriken/float16 in JS)
     onnx_model_fp16 = float16.convert_float_to_float16(
         onnx_model,
-        keep_io_types=True,  # Keep input/output as FP32 for easier integration
+        keep_io_types=False,  # Full FP16 graph including I/O
         min_positive_val=1e-7,
         max_finite_val=1e4,
     )
